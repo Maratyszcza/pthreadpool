@@ -9,8 +9,8 @@ import ninja_syntax
 
 class Configuration:
 
-    def __init__(self, options, ninja_build_file=os.path.join(os.path.dirname(os.path.abspath(__file__)), "build.ninja")):
-        self.output = open(ninja_build_file, "w")
+    def __init__(self, options):
+        self.output = open("build.ninja", "w")
         self.writer = ninja_syntax.Writer(self.output)
         self.source_dir = None
         self.build_dir = None
