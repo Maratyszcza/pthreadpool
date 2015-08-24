@@ -1,7 +1,7 @@
 /* Standard C headers */
 #include <stdint.h>
 #include <stdbool.h>
-#include <malloc.h>
+#include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 
@@ -207,7 +207,8 @@ struct pthreadpool* pthreadpool_create(size_t threads_count) {
 	if (threads_count == 0) {
 		threads_count = (size_t) sysconf(_SC_NPROCESSORS_ONLN);
 	}
-	struct pthreadpool* threadpool = memalign(64, sizeof(struct pthreadpool) + threads_count * sizeof(struct thread_info));
+	struct pthreadpool* threadpool = NULL;
+	posix_memalign((void**) &threadpool, 64, sizeof(struct pthreadpool) + threads_count * sizeof(struct thread_info));
 	memset(threadpool, 0, sizeof(struct pthreadpool) + threads_count * sizeof(struct thread_info));
 	threadpool->threads_count = threads_count;
 	pthread_mutex_init(&threadpool->execution_mutex, NULL);
