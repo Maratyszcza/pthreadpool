@@ -234,7 +234,7 @@ static inline size_t multiply_divide(size_t a, size_t b, size_t d) {
 	#if defined(__SIZEOF_SIZE_T__) && (__SIZEOF_SIZE_T__ == 4)
 		return (size_t) (((uint64_t) a) * ((uint64_t) b)) / ((uint64_t) d);
 	#elif defined(__SIZEOF_SIZE_T__) && (__SIZEOF_SIZE_T__ == 8)
-		return (size_t) (((uint128_t) a) * ((uint128_t) b)) / ((uint128_t) d);
+		return (size_t) (((__uint128_t) a) * ((__uint128_t) b)) / ((__uint128_t) d);
 	#else
 		#error "Unsupported platform"
 	#endif
