@@ -14,7 +14,15 @@
 
 #define PTHREADPOOL_CACHELINE_SIZE 64
 #define PTHREADPOOL_CACHELINE_ALIGNED __attribute__((__aligned__(PTHREADPOOL_CACHELINE_SIZE)))
-#define PTHREADPOOL_STATIC_ASSERT(predicate, message) _Static_assert((predicate), message)
+
+#if (defined(__clang__) && (__has_extension(c_static_assert) || __has_feature(c_static_assert))) || \
+	(defined(__GNUC__) && ((__GNUC__ > 4) || (__GNUC__ == 4) && (__GNUC_MINOR__ >= 6)))
+	/* Static assert is supported by gcc >= 4.6 and modern clang */
+	#define PTHREADPOOL_STATIC_ASSERT(predicate, message) _Static_assert((predicate), message)
+#else
+	/* Dummy declaration for legacy compilers */
+	#define PTHREADPOOL_STATIC_ASSERT(predicate, message)
+#endif
 
 enum thread_state {
 	thread_state_idle,
