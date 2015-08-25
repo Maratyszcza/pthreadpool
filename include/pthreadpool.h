@@ -32,7 +32,7 @@ pthreadpool_t pthreadpool_create(size_t threads_count);
  *
  * @returns  The number of threads in the thread pool.
  */
-uint32_t pthreadpool_get_threads_count(pthreadpool_t threadpool);
+size_t pthreadpool_get_threads_count(pthreadpool_t threadpool);
 
 
 /**
