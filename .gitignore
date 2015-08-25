@@ -3,9 +3,30 @@
 .ninja_log
 build.ninja
 
+# Autotools-generated files
+autom4te.cache
+aclocal.m4
+config.log
+config.status
+configure
+Makefile
+Makefile.in
+
+# Automake modules
+ar-lib
+compile
+install-sh
+missing
+depcomp
+
 # Build objects and artifacts
+src/.deps/*
+src/.dirstamp
 build/*
 artifacts/*
+*.o
+*.a
+examples/addition
 
 # System files
 .DS_Store
