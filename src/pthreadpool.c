@@ -28,6 +28,28 @@
 	#define PTHREADPOOL_STATIC_ASSERT(predicate, message)
 #endif
 
+static inline size_t multiply_divide(size_t a, size_t b, size_t d) {
+	#if defined(__SIZEOF_SIZE_T__) && (__SIZEOF_SIZE_T__ == 4)
+		return (size_t) (((uint64_t) a) * ((uint64_t) b)) / ((uint64_t) d);
+	#elif defined(__SIZEOF_SIZE_T__) && (__SIZEOF_SIZE_T__ == 8)
+		return (size_t) (((__uint128_t) a) * ((__uint128_t) b)) / ((__uint128_t) d);
+	#else
+		#error "Unsupported platform"
+	#endif
+}
+
+static inline size_t divide_round_up(size_t dividend, size_t divisor) {
+	if (dividend % divisor == 0) {
+		return dividend / divisor;
+	} else {
+		return dividend / divisor + 1;
+	}
+}
+
+static inline size_t min(size_t a, size_t b) {
+	return a < b ? a : b;
+}
+
 enum thread_state {
 	thread_state_idle,
 	thread_state_compute_1d,
@@ -81,7 +103,7 @@ struct PTHREADPOOL_CACHELINE_ALIGNED pthreadpool {
 	/**
 	 * The function to call for each item.
 	 */
-	volatile pthreadpool_function_1d_t function;
+	volatile void* function;
 	/**
 	 * The first argument to the item processing function.
 	 */
@@ -159,7 +181,7 @@ inline static bool atomic_decrement(volatile size_t* value) {
 }
 
 static void thread_compute_1d(struct pthreadpool* threadpool, struct thread_info* thread) {
-	const pthreadpool_function_1d_t function = threadpool->function;
+	const pthreadpool_function_1d_t function = (pthreadpool_function_1d_t) threadpool->function;
 	void *const argument = threadpool->argument;
 	/* Process thread's own range of items */
 	size_t range_start = thread->range_start;
@@ -220,7 +242,9 @@ struct pthreadpool* pthreadpool_create(size_t threads_count) {
 		threads_count = (size_t) sysconf(_SC_NPROCESSORS_ONLN);
 	}
 	struct pthreadpool* threadpool = NULL;
-	posix_memalign((void**) &threadpool, 64, sizeof(struct pthreadpool) + threads_count * sizeof(struct thread_info));
+	if (posix_memalign((void**) &threadpool, 64, sizeof(struct pthreadpool) + threads_count * sizeof(struct thread_info)) != 0) {
+		return NULL;
+	}
 	memset(threadpool, 0, sizeof(struct pthreadpool) + threads_count * sizeof(struct thread_info));
 	threadpool->threads_count = threads_count;
 	pthread_mutex_init(&threadpool->execution_mutex, NULL);
@@ -243,46 +267,112 @@ size_t pthreadpool_get_threads_count(struct pthreadpool* threadpool) {
 	return threadpool->threads_count;
 }
 
-static inline size_t multiply_divide(size_t a, size_t b, size_t d) {
-	#if defined(__SIZEOF_SIZE_T__) && (__SIZEOF_SIZE_T__ == 4)
-		return (size_t) (((uint64_t) a) * ((uint64_t) b)) / ((uint64_t) d);
-	#elif defined(__SIZEOF_SIZE_T__) && (__SIZEOF_SIZE_T__ == 8)
-		return (size_t) (((__uint128_t) a) * ((__uint128_t) b)) / ((__uint128_t) d);
-	#else
-		#error "Unsupported platform"
-	#endif
-}
-
 void pthreadpool_compute_1d(
 	struct pthreadpool* threadpool,
 	pthreadpool_function_1d_t function,
 	void* argument,
-	size_t items)
+	size_t range)
 {
-	/* Protect the global threadpool structures */
-	pthread_mutex_lock(&threadpool->execution_mutex);
+	if (threadpool == NULL) {
+		/* No thread pool provided: execute function sequentially on the calling thread */
+		for (size_t i = 0; i < range; i++) {
+			function(argument, i);
+		}
+	} else {
+		/* Protect the global threadpool structures */
+		pthread_mutex_lock(&threadpool->execution_mutex);
 
-	/* Spread the work between threads */
-	for (size_t tid = 0; tid < threadpool->threads_count; tid++) {
-		struct thread_info* thread = &threadpool->threads[tid];
-		thread->range_start = multiply_divide(items, tid, threadpool->threads_count);
-		thread->range_end = multiply_divide(items, tid + 1, threadpool->threads_count);
-		thread->range_length = thread->range_end - thread->range_start;
-		thread->state = thread_state_compute_1d;
+		/* Spread the work between threads */
+		for (size_t tid = 0; tid < threadpool->threads_count; tid++) {
+			struct thread_info* thread = &threadpool->threads[tid];
+			thread->range_start = multiply_divide(range, tid, threadpool->threads_count);
+			thread->range_end = multiply_divide(range, tid + 1, threadpool->threads_count);
+			thread->range_length = thread->range_end - thread->range_start;
+			thread->state = thread_state_compute_1d;
+		}
+
+		/* Setup global arguments */
+		threadpool->function = function;
+		threadpool->argument = argument;
+
+		/* Wake up the threads */
+		wakeup_worker_threads(threadpool);
+
+		/* Wait until the threads finish computation */
+		wait_worker_threads(threadpool);
+
+		/* Unprotect the global threadpool structures */
+		pthread_mutex_unlock(&threadpool->execution_mutex);
 	}
+}
 
-	/* Setup global arguments */
-	threadpool->function = function;
-	threadpool->argument = argument;
+struct compute_2d_context {
+	pthreadpool_function_2d_t function;
+	void* argument;
+	size_t range_j;
+};
 
-	/* Wake up the threads */
-	wakeup_worker_threads(threadpool);
+static void compute_2d(const struct compute_2d_context* context, size_t linear_index) {
+	const size_t range_j = context->range_j;
+	context->function(context->argument, linear_index / range_j, linear_index % range_j);
+}
 
-	/* Wait until the threads finish computation */
-	wait_worker_threads(threadpool);
+void pthreadpool_compute_2d(
+	struct pthreadpool* threadpool,
+	pthreadpool_function_2d_t function,
+	void* argument,
+	size_t range_i,
+	size_t range_j)
+{
+	struct compute_2d_context context = {
+		.function = function,
+		.argument = argument,
+		.range_j = range_j
+	};
+	pthreadpool_compute_1d(threadpool, (pthreadpool_function_1d_t) compute_2d, &context, range_i * range_j);
+}
 
-	/* Unprotect the global threadpool structures */
-	pthread_mutex_unlock(&threadpool->execution_mutex);
+struct compute_2d_tiled_context {
+	pthreadpool_function_2d_tiled_t function;
+	void* argument;
+	size_t tile_range_j;
+	size_t range_i;
+	size_t range_j;
+	size_t tile_i;
+	size_t tile_j;
+};
+
+static void compute_2d_tiled(const struct compute_2d_tiled_context* context, size_t linear_index) {
+	const size_t tile_index_i = linear_index / context->tile_range_j;
+	const size_t tile_index_j = linear_index % context->tile_range_j;
+	const size_t index_i = tile_index_i * context->tile_i;
+	const size_t index_j = tile_index_j * context->tile_j;
+	const size_t tile_i = min(context->tile_i, context->range_i - index_i);
+	const size_t tile_j = min(context->tile_j, context->range_j - index_j);
+	context->function(context->argument, index_i, index_j, tile_i, tile_j);
+}
+
+void pthreadpool_compute_2d_tiled(
+	pthreadpool_t threadpool,
+	pthreadpool_function_2d_tiled_t function,
+	void* argument,
+	size_t range_i,
+	size_t range_j,
+	size_t tile_i,
+	size_t tile_j)
+{
+	const size_t tile_range_i = divide_round_up(range_i, tile_i);
+	const size_t tile_range_j = divide_round_up(range_j, tile_j);
+	struct compute_2d_tiled_context context = {
+		.function = function,
+		.argument = argument,
+		.tile_range_j = tile_range_j,
+		.range_i = range_i,
+		.range_j = range_j,
+		.tile_i = tile_i,
+		.tile_j = tile_j
+	};
+	pthreadpool_compute_1d(threadpool, (pthreadpool_function_1d_t) compute_2d_tiled, &context, tile_range_i * tile_range_j);
 }
 
 void pthreadpool_destroy(struct pthreadpool* threadpool) {

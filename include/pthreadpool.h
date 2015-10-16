@@ -7,6 +7,7 @@ typedef struct pthreadpool* pthreadpool_t;
 
 typedef void (*pthreadpool_function_1d_t)(void*, size_t);
 typedef void (*pthreadpool_function_2d_t)(void*, size_t, size_t);
+typedef void (*pthreadpool_function_2d_tiled_t)(void*, size_t, size_t, size_t, size_t);
 typedef void (*pthreadpool_function_3d_t)(void*, size_t, size_t, size_t);
 
 #ifdef __cplusplus
@@ -54,7 +55,23 @@ void pthreadpool_compute_1d(
 	pthreadpool_t threadpool,
 	pthreadpool_function_1d_t function,
 	void* argument,
-	size_t items);
+	size_t range);
+
+void pthreadpool_compute_2d(
+	pthreadpool_t threadpool,
+	pthreadpool_function_2d_t function,
+	void* argument,
+	size_t range_i,
+	size_t range_j);
+
+void pthreadpool_compute_2d_tiled(
+	pthreadpool_t threadpool,
+	pthreadpool_function_2d_tiled_t function,
+	void* argument,
+	size_t range_i,
+	size_t range_j,
+	size_t tile_i,
+	size_t tile_j);
 
 /**
  * Terminates threads in the thread pool and releases associated resources.
