@@ -306,6 +306,37 @@ void pthreadpool_compute_1d(
 	}
 }
 
+struct compute_1d_tiled_context {
+	pthreadpool_function_1d_tiled_t function;
+	void* argument;
+	size_t range;
+	size_t tile;
+};
+
+static void compute_1d_tiled(const struct compute_1d_tiled_context* context, size_t linear_index) {
+	const size_t tile_index = linear_index;
+	const size_t index = tile_index * context->tile;
+	const size_t tile = min(context->tile, context->range - index);
+	context->function(context->argument, index, tile);
+}
+
+void pthreadpool_compute_1d_tiled(
+	pthreadpool_t threadpool,
+	pthreadpool_function_1d_tiled_t function,
+	void* argument,
+	size_t range,
+	size_t tile)
+{
+	const size_t tile_range = divide_round_up(range, tile);
+	struct compute_1d_tiled_context context = {
+		.function = function,
+		.argument = argument,
+		.range = range,
+		.tile = tile
+	};
+	pthreadpool_compute_1d(threadpool, (pthreadpool_function_1d_t) compute_1d_tiled, &context, tile_range);
+}
+
 struct compute_2d_context {
 	pthreadpool_function_2d_t function;
 	void* argument;

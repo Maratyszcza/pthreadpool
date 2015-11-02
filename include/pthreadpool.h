@@ -6,6 +6,7 @@
 typedef struct pthreadpool* pthreadpool_t;
 
 typedef void (*pthreadpool_function_1d_t)(void*, size_t);
+typedef void (*pthreadpool_function_1d_tiled_t)(void*, size_t, size_t);
 typedef void (*pthreadpool_function_2d_t)(void*, size_t, size_t);
 typedef void (*pthreadpool_function_2d_tiled_t)(void*, size_t, size_t, size_t, size_t);
 typedef void (*pthreadpool_function_3d_t)(void*, size_t, size_t, size_t);
@@ -56,6 +57,13 @@ void pthreadpool_compute_1d(
 	pthreadpool_function_1d_t function,
 	void* argument,
 	size_t range);
+
+void pthreadpool_compute_1d_tiled(
+	pthreadpool_t threadpool,
+	pthreadpool_function_1d_tiled_t function,
+	void* argument,
+	size_t range,
+	size_t tile);
 
 void pthreadpool_compute_2d(
 	pthreadpool_t threadpool,
