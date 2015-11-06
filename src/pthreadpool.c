@@ -282,6 +282,13 @@ void pthreadpool_compute_1d(
 		/* Protect the global threadpool structures */
 		pthread_mutex_lock(&threadpool->execution_mutex);
 
+		/* Lock the state variables to ensure that threads don't start processing before they observe complete state */
+		pthread_mutex_lock(&threadpool->state_mutex);
+
+		/* Setup global arguments */
+		threadpool->function = function;
+		threadpool->argument = argument;
+
 		/* Spread the work between threads */
 		for (size_t tid = 0; tid < threadpool->threads_count; tid++) {
 			struct thread_info* thread = &threadpool->threads[tid];
@@ -291,9 +298,8 @@ void pthreadpool_compute_1d(
 			thread->state = thread_state_compute_1d;
 		}
 
-		/* Setup global arguments */
-		threadpool->function = function;
-		threadpool->argument = argument;
+		/* Unlock the state variables before waking up the threads for better performance */
+		pthread_mutex_unlock(&threadpool->state_mutex);
 
 		/* Wake up the threads */
 		wakeup_worker_threads(threadpool);
