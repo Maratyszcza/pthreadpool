@@ -9,6 +9,9 @@
 #include <pthread.h>
 #include <unistd.h>
 
+/* Dependencies */
+#include <fxdiv.h>
+
 /* Library header */
 #include <pthreadpool.h>
 
@@ -346,12 +349,13 @@ void pthreadpool_compute_1d_tiled(
 struct compute_2d_context {
 	pthreadpool_function_2d_t function;
 	void* argument;
-	size_t range_j;
+	struct fxdiv_divisor_size_t range_j;
 };
 
 static void compute_2d(const struct compute_2d_context* context, size_t linear_index) {
-	const size_t range_j = context->range_j;
-	context->function(context->argument, linear_index / range_j, linear_index % range_j);
+	const struct fxdiv_divisor_size_t range_j = context->range_j;
+	const struct fxdiv_result_size_t index = fxdiv_divide_size_t(linear_index, range_j);
+	context->function(context->argument, index.quotient, index.remainder);
 }
 
 void pthreadpool_compute_2d(
@@ -364,7 +368,7 @@ void pthreadpool_compute_2d(
 	struct compute_2d_context context = {
 		.function = function,
 		.argument = argument,
-		.range_j = range_j
+		.range_j = fxdiv_init_size_t(range_j)
 	};
 	pthreadpool_compute_1d(threadpool, (pthreadpool_function_1d_t) compute_2d, &context, range_i * range_j);
 }
@@ -372,7 +376,7 @@ void pthreadpool_compute_2d(
 struct compute_2d_tiled_context {
 	pthreadpool_function_2d_tiled_t function;
 	void* argument;
-	size_t tile_range_j;
+	struct fxdiv_divisor_size_t tile_range_j;
 	size_t range_i;
 	size_t range_j;
 	size_t tile_i;
@@ -380,12 +384,14 @@ struct compute_2d_tiled_context {
 };
 
 static void compute_2d_tiled(const struct compute_2d_tiled_context* context, size_t linear_index) {
-	const size_t tile_index_i = linear_index / context->tile_range_j;
-	const size_t tile_index_j = linear_index % context->tile_range_j;
-	const size_t index_i = tile_index_i * context->tile_i;
-	const size_t index_j = tile_index_j * context->tile_j;
-	const size_t tile_i = min(context->tile_i, context->range_i - index_i);
-	const size_t tile_j = min(context->tile_j, context->range_j - index_j);
+	const struct fxdiv_divisor_size_t tile_range_j = context->tile_range_j;
+	const struct fxdiv_result_size_t tile_index = fxdiv_divide_size_t(linear_index, tile_range_j);
+	const size_t max_tile_i = context->tile_i;
+	const size_t max_tile_j = context->tile_j;
+	const size_t index_i = tile_index.quotient * max_tile_i;
+	const size_t index_j = tile_index.remainder * max_tile_j;
+	const size_t tile_i = min(max_tile_i, context->range_i - index_i);
+	const size_t tile_j = min(max_tile_j, context->range_j - index_j);
 	context->function(context->argument, index_i, index_j, tile_i, tile_j);
 }
 
@@ -403,7 +409,7 @@ void pthreadpool_compute_2d_tiled(
 	struct compute_2d_tiled_context context = {
 		.function = function,
 		.argument = argument,
-		.tile_range_j = tile_range_j,
+		.tile_range_j = fxdiv_init_size_t(tile_range_j),
 		.range_i = range_i,
 		.range_j = range_j,
 		.tile_i = tile_i,
