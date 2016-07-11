@@ -336,14 +336,22 @@ void pthreadpool_compute_1d_tiled(
 	size_t range,
 	size_t tile)
 {
-	const size_t tile_range = divide_round_up(range, tile);
-	struct compute_1d_tiled_context context = {
-		.function = function,
-		.argument = argument,
-		.range = range,
-		.tile = tile
-	};
-	pthreadpool_compute_1d(threadpool, (pthreadpool_function_1d_t) compute_1d_tiled, &context, tile_range);
+	if (threadpool == NULL) {
+		/* No thread pool provided: execute function sequentially on the calling thread */
+		for (size_t i = 0; i < range; i += tile) {
+			function(argument, i, min(range - i, tile));
+		}
+	} else {
+		/* Execute in parallel on the thread pool using linearized index */
+		const size_t tile_range = divide_round_up(range, tile);
+		struct compute_1d_tiled_context context = {
+			.function = function,
+			.argument = argument,
+			.range = range,
+			.tile = tile
+		};
+		pthreadpool_compute_1d(threadpool, (pthreadpool_function_1d_t) compute_1d_tiled, &context, tile_range);
+	}
 }
 
 struct compute_2d_context {
@@ -365,12 +373,22 @@ void pthreadpool_compute_2d(
 	size_t range_i,
 	size_t range_j)
 {
-	struct compute_2d_context context = {
-		.function = function,
-		.argument = argument,
-		.range_j = fxdiv_init_size_t(range_j)
-	};
-	pthreadpool_compute_1d(threadpool, (pthreadpool_function_1d_t) compute_2d, &context, range_i * range_j);
+	if (threadpool == NULL) {
+		/* No thread pool provided: execute function sequentially on the calling thread */
+		for (size_t i = 0; i < range_i; i++) {
+			for (size_t j = 0; j < range_j; j++) {
+				function(argument, i, j);
+			}
+		}
+	} else {
+		/* Execute in parallel on the thread pool using linearized index */
+		struct compute_2d_context context = {
+			.function = function,
+			.argument = argument,
+			.range_j = fxdiv_init_size_t(range_j)
+		};
+		pthreadpool_compute_1d(threadpool, (pthreadpool_function_1d_t) compute_2d, &context, range_i * range_j);
+	}
 }
 
 struct compute_2d_tiled_context {
@@ -404,18 +422,28 @@ void pthreadpool_compute_2d_tiled(
 	size_t tile_i,
 	size_t tile_j)
 {
-	const size_t tile_range_i = divide_round_up(range_i, tile_i);
-	const size_t tile_range_j = divide_round_up(range_j, tile_j);
-	struct compute_2d_tiled_context context = {
-		.function = function,
-		.argument = argument,
-		.tile_range_j = fxdiv_init_size_t(tile_range_j),
-		.range_i = range_i,
-		.range_j = range_j,
-		.tile_i = tile_i,
-		.tile_j = tile_j
-	};
-	pthreadpool_compute_1d(threadpool, (pthreadpool_function_1d_t) compute_2d_tiled, &context, tile_range_i * tile_range_j);
+	if (threadpool == NULL) {
+		/* No thread pool provided: execute function sequentially on the calling thread */
+		for (size_t i = 0; i < range_i; i += tile_i) {
+			for (size_t j = 0; j < range_j; j += tile_j) {
+				function(argument, i, j, min(range_i - i, tile_i), min(range_j - j, tile_j));
+			}
+		}
+	} else {
+		/* Execute in parallel on the thread pool using linearized index */
+		const size_t tile_range_i = divide_round_up(range_i, tile_i);
+		const size_t tile_range_j = divide_round_up(range_j, tile_j);
+		struct compute_2d_tiled_context context = {
+			.function = function,
+			.argument = argument,
+			.tile_range_j = fxdiv_init_size_t(tile_range_j),
+			.range_i = range_i,
+			.range_j = range_j,
+			.tile_i = tile_i,
+			.tile_j = tile_j
+		};
+		pthreadpool_compute_1d(threadpool, (pthreadpool_function_1d_t) compute_2d_tiled, &context, tile_range_i * tile_range_j);
+	}
 }
 
 void pthreadpool_destroy(struct pthreadpool* threadpool) {
