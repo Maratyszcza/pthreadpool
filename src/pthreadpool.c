@@ -244,8 +244,17 @@ struct pthreadpool* pthreadpool_create(size_t threads_count) {
 	if (threads_count == 0) {
 		threads_count = (size_t) sysconf(_SC_NPROCESSORS_ONLN);
 	}
+#if !defined(__ANDROID__)
 	struct pthreadpool* threadpool = NULL;
 	if (posix_memalign((void**) &threadpool, 64, sizeof(struct pthreadpool) + threads_count * sizeof(struct thread_info)) != 0) {
+#else
+	/*
+	 * Android didn't get posix_memalign until API level 17 (Android 4.2).
+	 * Use (otherwise obsolete) memalign function on Android platform.
+	 */
+	struct pthreadpool* threadpool = memalign(64, sizeof(struct pthreadpool) + threads_count * sizeof(struct thread_info));
+	if (threadpool == NULL) {
+#endif
 		return NULL;
 	}
 	memset(threadpool, 0, sizeof(struct pthreadpool) + threads_count * sizeof(struct thread_info));
