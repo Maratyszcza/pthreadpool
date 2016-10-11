@@ -20,13 +20,13 @@
 
 #if defined(__clang__)
 	#if __has_extension(c_static_assert) || __has_feature(c_static_assert)
-		#define PTHREADPOOL_STATIC_ASSERT(predicate, message) _Static_assert((predicate), message)
+		#define PTHREADPOOL_STATIC_ASSERT(predicate, message) static_assert((predicate), message)
 	#else
 		#define PTHREADPOOL_STATIC_ASSERT(predicate, message)
 	#endif
 #elif defined(__GNUC__) && ((__GNUC__ > 4) || (__GNUC__ == 4) && (__GNUC_MINOR__ >= 6))
 	/* Static assert is supported by gcc >= 4.6 */
-	#define PTHREADPOOL_STATIC_ASSERT(predicate, message) _Static_assert((predicate), message)
+	#define PTHREADPOOL_STATIC_ASSERT(predicate, message) static_assert((predicate), message)
 #else
 	#define PTHREADPOOL_STATIC_ASSERT(predicate, message)
 #endif
