@@ -183,14 +183,17 @@ static void thread_compute_1d(struct pthreadpool* threadpool, struct thread_info
 		function(argument, range_start++);
 	}
 	/* Done, now look for other threads' items to steal */
-	const size_t thread_number = thread->thread_number;
-	const size_t threads_count = threadpool->threads_count;
-	for (size_t tid = (thread_number + 1) % threads_count; tid != thread_number; tid = (tid + 1) % threads_count) {
-		struct thread_info* other_thread = &threadpool->threads[tid];
-		if (other_thread->state != thread_state_idle) {
-			while (atomic_decrement(&other_thread->range_length)) {
-				const size_t item_id = __sync_sub_and_fetch(&other_thread->range_end, 1);
-				function(argument, item_id);
+	if (threadpool->active_threads > 1) {
+		/* There are still other threads with work */
+		const size_t thread_number = thread->thread_number;
+		const size_t threads_count = threadpool->threads_count;
+		for (size_t tid = (thread_number + 1) % threads_count; tid != thread_number; tid = (tid + 1) % threads_count) {
+			struct thread_info* other_thread = &threadpool->threads[tid];
+			if (other_thread->state != thread_state_idle) {
+				while (atomic_decrement(&other_thread->range_length)) {
+					const size_t item_id = __sync_sub_and_fetch(&other_thread->range_end, 1);
+					function(argument, item_id);
+				}
 			}
 		}
 	}
