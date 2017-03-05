@@ -452,33 +452,35 @@ void pthreadpool_compute_2d_tiled(
 }
 
 void pthreadpool_destroy(struct pthreadpool* threadpool) {
-	/* Lock the state variables to ensure that threads don't start processing before they observe complete state */
-	pthread_mutex_lock(&threadpool->state_mutex);
+	if (threadpool != NULL) {
+		/* Lock the state variables to ensure that threads don't start processing before they observe complete state */
+		pthread_mutex_lock(&threadpool->state_mutex);
 
-	/* Locking of barrier_mutex not needed: readers are sleeping on state_condvar */
-	threadpool->checkedin_threads = 0;
+		/* Locking of barrier_mutex not needed: readers are sleeping on state_condvar */
+		threadpool->checkedin_threads = 0;
 
-	/* Update threads' states */
-	for (size_t tid = 0; tid < threadpool->threads_count; tid++) {
-		threadpool->threads[tid].state = thread_state_shutdown;
+		/* Update threads' states */
+		for (size_t tid = 0; tid < threadpool->threads_count; tid++) {
+			threadpool->threads[tid].state = thread_state_shutdown;
+		}
+
+		/* Wake up worker threads */
+		pthread_cond_broadcast(&threadpool->state_condvar);
+
+		/* Commit the state changes and let workers start processing */
+		pthread_mutex_unlock(&threadpool->state_mutex);
+
+		/* Wait until all threads return */
+		for (size_t tid = 0; tid < threadpool->threads_count; tid++) {
+			pthread_join(threadpool->threads[tid].thread_object, NULL);
+		}
+
+		/* Release resources */
+		pthread_mutex_destroy(&threadpool->execution_mutex);
+		pthread_mutex_destroy(&threadpool->barrier_mutex);
+		pthread_cond_destroy(&threadpool->barrier_condvar);
+		pthread_mutex_destroy(&threadpool->state_mutex);
+		pthread_cond_destroy(&threadpool->state_condvar);
+		free(threadpool);
 	}
-
-	/* Wake up worker threads */
-	pthread_cond_broadcast(&threadpool->state_condvar);
-
-	/* Commit the state changes and let workers start processing */
-	pthread_mutex_unlock(&threadpool->state_mutex);
-
-	/* Wait until all threads return */
-	for (size_t tid = 0; tid < threadpool->threads_count; tid++) {
-		pthread_join(threadpool->threads[tid].thread_object, NULL);
-	}
-
-	/* Release resources */
-	pthread_mutex_destroy(&threadpool->execution_mutex);
-	pthread_mutex_destroy(&threadpool->barrier_mutex);
-	pthread_cond_destroy(&threadpool->barrier_condvar);
-	pthread_mutex_destroy(&threadpool->state_mutex);
-	pthread_cond_destroy(&threadpool->state_condvar);
-	free(threadpool);
 }

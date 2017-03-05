@@ -22,9 +22,7 @@ static void pthreadpool_compute_1d(benchmark::State& state) {
 	while (state.KeepRunning()) {
 		pthreadpool_compute_1d(threadpool, compute_1d, NULL, threads);
 	}
-	if (threads != 0) {
-		pthreadpool_destroy(threadpool);
-	}
+	pthreadpool_destroy(threadpool);
 }
 BENCHMARK(pthreadpool_compute_1d)->UseRealTime()->Apply(SetNumberOfThreads);
 
@@ -38,9 +36,7 @@ static void pthreadpool_compute_1d_tiled(benchmark::State& state) {
 	while (state.KeepRunning()) {
 		pthreadpool_compute_1d_tiled(threadpool, compute_1d_tiled, NULL, threads, 1);
 	}
-	if (threads != 0) {
-		pthreadpool_destroy(threadpool);
-	}
+	pthreadpool_destroy(threadpool);
 }
 BENCHMARK(pthreadpool_compute_1d_tiled)->UseRealTime()->Apply(SetNumberOfThreads);
 
@@ -54,9 +50,7 @@ static void pthreadpool_compute_2d(benchmark::State& state) {
 	while (state.KeepRunning()) {
 		pthreadpool_compute_2d(threadpool, compute_2d, NULL, 1, threads);
 	}
-	if (threads != 0) {
-		pthreadpool_destroy(threadpool);
-	}
+	pthreadpool_destroy(threadpool);
 }
 BENCHMARK(pthreadpool_compute_2d)->UseRealTime()->Apply(SetNumberOfThreads);
 
@@ -70,9 +64,7 @@ static void pthreadpool_compute_2d_tiled(benchmark::State& state) {
 	while (state.KeepRunning()) {
 		pthreadpool_compute_2d_tiled(threadpool, compute_2d_tiled, NULL, 1, threads, 1, 1);
 	}
-	if (threads != 0) {
-		pthreadpool_destroy(threadpool);
-	}
+	pthreadpool_destroy(threadpool);
 }
 BENCHMARK(pthreadpool_compute_2d_tiled)->UseRealTime()->Apply(SetNumberOfThreads);
 
