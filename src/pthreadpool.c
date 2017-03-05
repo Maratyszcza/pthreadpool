@@ -163,13 +163,6 @@ static void wait_worker_threads(struct pthreadpool* threadpool) {
 	}
 }
 
-static void wakeup_worker_threads(struct pthreadpool* threadpool) {
-	pthread_mutex_lock(&threadpool->state_mutex);
-	threadpool->checkedin_threads = 0; /* Locking of barrier_mutex not needed: readers are sleeping */
-	pthread_cond_broadcast(&threadpool->state_condvar);
-	pthread_mutex_unlock(&threadpool->state_mutex); /* Do wake up */
-}
-
 inline static bool atomic_decrement(volatile size_t* value) {
 	size_t actual_value = *value;
 	if (actual_value != 0) {
@@ -301,6 +294,9 @@ void pthreadpool_compute_1d(
 		threadpool->function = function;
 		threadpool->argument = argument;
 
+		/* Locking of barrier_mutex not needed: readers are sleeping on state_condvar */
+		threadpool->checkedin_threads = 0;
+
 		/* Spread the work between threads */
 		for (size_t tid = 0; tid < threadpool->threads_count; tid++) {
 			struct thread_info* thread = &threadpool->threads[tid];
@@ -314,7 +310,7 @@ void pthreadpool_compute_1d(
 		pthread_mutex_unlock(&threadpool->state_mutex);
 
 		/* Wake up the threads */
-		wakeup_worker_threads(threadpool);
+		pthread_cond_broadcast(&threadpool->state_condvar);
 
 		/* Wait until the threads finish computation */
 		wait_worker_threads(threadpool);
@@ -456,13 +452,22 @@ void pthreadpool_compute_2d_tiled(
 }
 
 void pthreadpool_destroy(struct pthreadpool* threadpool) {
+	/* Lock the state variables to ensure that threads don't start processing before they observe complete state */
+	pthread_mutex_lock(&threadpool->state_mutex);
+
+	/* Locking of barrier_mutex not needed: readers are sleeping on state_condvar */
+	threadpool->checkedin_threads = 0;
+
 	/* Update threads' states */
 	for (size_t tid = 0; tid < threadpool->threads_count; tid++) {
 		threadpool->threads[tid].state = thread_state_shutdown;
 	}
 
-	/* Wake up the threads */
-	wakeup_worker_threads(threadpool);
+	/* Wake up worker threads */
+	pthread_cond_broadcast(&threadpool->state_condvar);
+
+	/* Commit the state changes and let workers start processing */
+	pthread_mutex_unlock(&threadpool->state_mutex);
 
 	/* Wait until all threads return */
 	for (size_t tid = 0; tid < threadpool->threads_count; tid++) {
