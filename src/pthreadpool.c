@@ -100,9 +100,9 @@ PTHREADPOOL_STATIC_ASSERT(sizeof(struct thread_info) % PTHREADPOOL_CACHELINE_SIZ
 
 struct PTHREADPOOL_CACHELINE_ALIGNED pthreadpool {
 	/**
-	 * The number of threads that signalled completion of an operation.
+	 * The number of threads that are processing an operation.
 	 */
-	volatile size_t checkedin_threads;
+	volatile size_t active_threads;
 	/**
 	 * The function to call for each item.
 	 */
@@ -116,13 +116,13 @@ struct PTHREADPOOL_CACHELINE_ALIGNED pthreadpool {
 	 */
 	pthread_mutex_t execution_mutex;
 	/**
-	 * Guards access to the @a checkedin_threads variable.
+	 * Guards access to the @a active_threads variable.
 	 */
-	pthread_mutex_t barrier_mutex;
+	pthread_mutex_t completion_mutex;
 	/**
-	 * Condition variable to wait until all threads check in.
+	 * Condition variable to wait until all threads complete an operation.
 	 */
-	pthread_cond_t barrier_condvar;
+	pthread_cond_t completion_condvar;
 	/**
 	 * Guards access to the @a state variables.
 	 */
@@ -144,22 +144,20 @@ struct PTHREADPOOL_CACHELINE_ALIGNED pthreadpool {
 PTHREADPOOL_STATIC_ASSERT(sizeof(struct pthreadpool) % PTHREADPOOL_CACHELINE_SIZE == 0, "pthreadpool structure must occupy an integer number of cache lines (64 bytes)");
 
 static void checkin_worker_thread(struct pthreadpool* threadpool) {
-	pthread_mutex_lock(&threadpool->barrier_mutex);
-	const size_t checkedin_threads = threadpool->checkedin_threads + 1;
-	threadpool->checkedin_threads = checkedin_threads;
-	if (checkedin_threads == threadpool->threads_count) {
-		pthread_cond_signal(&threadpool->barrier_condvar);
+	pthread_mutex_lock(&threadpool->completion_mutex);
+	if (--threadpool->active_threads == 0) {
+		pthread_cond_signal(&threadpool->completion_condvar);
 	}
-	pthread_mutex_unlock(&threadpool->barrier_mutex);
+	pthread_mutex_unlock(&threadpool->completion_mutex);
 }
 
 static void wait_worker_threads(struct pthreadpool* threadpool) {
-	if (threadpool->checkedin_threads != threadpool->threads_count) {
-		pthread_mutex_lock(&threadpool->barrier_mutex);
-		while (threadpool->checkedin_threads != threadpool->threads_count) {
-			pthread_cond_wait(&threadpool->barrier_condvar, &threadpool->barrier_mutex);
+	if (threadpool->active_threads != 0) {
+		pthread_mutex_lock(&threadpool->completion_mutex);
+		while (threadpool->active_threads != 0) {
+			pthread_cond_wait(&threadpool->completion_condvar, &threadpool->completion_mutex);
 		};
-		pthread_mutex_unlock(&threadpool->barrier_mutex);
+		pthread_mutex_unlock(&threadpool->completion_mutex);
 	}
 }
 
@@ -253,10 +251,12 @@ struct pthreadpool* pthreadpool_create(size_t threads_count) {
 	memset(threadpool, 0, sizeof(struct pthreadpool) + threads_count * sizeof(struct thread_info));
 	threadpool->threads_count = threads_count;
 	pthread_mutex_init(&threadpool->execution_mutex, NULL);
-	pthread_mutex_init(&threadpool->barrier_mutex, NULL);
-	pthread_cond_init(&threadpool->barrier_condvar, NULL);
+	pthread_mutex_init(&threadpool->completion_mutex, NULL);
+	pthread_cond_init(&threadpool->completion_condvar, NULL);
 	pthread_mutex_init(&threadpool->state_mutex, NULL);
 	pthread_cond_init(&threadpool->state_condvar, NULL);
+
+	threadpool->active_threads = threadpool->threads_count;
 
 	for (size_t tid = 0; tid < threads_count; tid++) {
 		threadpool->threads[tid].thread_number = tid;
@@ -294,8 +294,8 @@ void pthreadpool_compute_1d(
 		threadpool->function = function;
 		threadpool->argument = argument;
 
-		/* Locking of barrier_mutex not needed: readers are sleeping on state_condvar */
-		threadpool->checkedin_threads = 0;
+		/* Locking of completion_mutex not needed: readers are sleeping on state_condvar */
+		threadpool->active_threads = threadpool->threads_count;
 
 		/* Spread the work between threads */
 		for (size_t tid = 0; tid < threadpool->threads_count; tid++) {
@@ -456,8 +456,8 @@ void pthreadpool_destroy(struct pthreadpool* threadpool) {
 		/* Lock the state variables to ensure that threads don't start processing before they observe complete state */
 		pthread_mutex_lock(&threadpool->state_mutex);
 
-		/* Locking of barrier_mutex not needed: readers are sleeping on state_condvar */
-		threadpool->checkedin_threads = 0;
+		/* Locking of completion_mutex not needed: readers are sleeping on state_condvar */
+		threadpool->active_threads = threadpool->threads_count;
 
 		/* Update threads' states */
 		for (size_t tid = 0; tid < threadpool->threads_count; tid++) {
@@ -477,8 +477,8 @@ void pthreadpool_destroy(struct pthreadpool* threadpool) {
 
 		/* Release resources */
 		pthread_mutex_destroy(&threadpool->execution_mutex);
-		pthread_mutex_destroy(&threadpool->barrier_mutex);
-		pthread_cond_destroy(&threadpool->barrier_condvar);
+		pthread_mutex_destroy(&threadpool->completion_mutex);
+		pthread_cond_destroy(&threadpool->completion_condvar);
 		pthread_mutex_destroy(&threadpool->state_mutex);
 		pthread_cond_destroy(&threadpool->state_condvar);
 		free(threadpool);
