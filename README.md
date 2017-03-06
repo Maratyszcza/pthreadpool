@@ -1,4 +1,8 @@
 # pthreadpool
+
+[![BSD (2 clause) License](https://img.shields.io/badge/License-BSD%202--Clause%20%22Simplified%22%20License-blue.svg)](https://github.com/Maratyszcza/pthreadpool/blob/master/LICENSE)
+[![Build Status](https://img.shields.io/travis/Maratyszcza/pthreadpool.svg)](https://travis-ci.org/Maratyszcza/pthreadpool)
+
 **pthreadpool** is a pthread-based thread pool implementation.
 Is is intended to provide functionality of `#pragma omp parallel for` for POSIX systems where OpenMP is not available.
 
