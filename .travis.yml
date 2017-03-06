@@ -1,0 +1,24 @@
+dist: trusty
+language: c
+install:
+ - git clone https://github.com/ninja-build/ninja.git /tmp/ninja
+ - pushd /tmp/ninja
+ - git checkout release
+ - python configure.py --bootstrap
+ - mkdir -p $HOME/.local/bin
+ - install -m 755 /tmp/ninja/ninja $HOME/.local/bin/ninja
+ - popd
+ - export PATH=$HOME/.local/bin:$PATH
+ - pip install --user six
+ - pip install --user git+https://github.com/Maratyszcza/confu
+before_script:
+ - confu setup
+ - ./configure.py
+ - ninja
+script:
+ - ninja test
+ - ninja bench
+addons:
+  apt:
+    packages:
+    - python-pip
