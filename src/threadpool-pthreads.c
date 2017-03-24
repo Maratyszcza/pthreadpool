@@ -13,6 +13,9 @@
 	#define PTHREADPOOL_USE_FUTEX 1
 	#include <sys/syscall.h>
 	#include <linux/futex.h>
+#elif defined(__native_client__)
+	#define PTHREADPOOL_USE_FUTEX 1
+	#include <irt.h>
 #else
 	#define PTHREADPOOL_USE_FUTEX 0
 #endif
@@ -71,6 +74,21 @@ static inline size_t min(size_t a, size_t b) {
 		static int futex_wake_all(volatile uint32_t* address) {
 			return syscall(SYS_futex, address, FUTEX_WAKE_PRIVATE, INT_MAX,
 				NULL, NULL, 0);
+		}
+	#elif defined(__native_client__)
+		static struct nacl_irt_futex nacl_irt_futex = { 0 };
+		static pthread_once_t nacl_init_guard = PTHREAD_ONCE_INIT;
+		static void nacl_init(void) {
+			nacl_interface_query(NACL_IRT_FUTEX_v0_1, &nacl_irt_futex, sizeof(nacl_irt_futex));
+		}
+
+		static int futex_wait(volatile uint32_t* address, uint32_t value) {
+			return nacl_irt_futex.futex_wait_abs((volatile int*) address, (int) value, NULL);
+		}
+
+		static int futex_wake_all(volatile uint32_t* address) {
+			int count;
+			return nacl_irt_futex.futex_wake((volatile int*) address, INT_MAX, &count);
 		}
 	#else
 		#error "Platform-specific implementation of futex_wait and futex_wake_all required"
@@ -200,7 +218,7 @@ static void wait_worker_threads(struct pthreadpool* threadpool) {
 	#if PTHREADPOOL_USE_FUTEX
 		uint32_t has_active_threads;
 		while ((has_active_threads = threadpool->has_active_threads) != 0) {
-			futex_wait(&threadpool->has_active_threads, has_active_threads);
+			futex_wait(&threadpool->has_active_threads, 1);
 		}
 	#else
 		if (threadpool->active_threads != 0) {
@@ -296,6 +314,10 @@ static void* thread_main(void* arg) {
 }
 
 struct pthreadpool* pthreadpool_create(size_t threads_count) {
+#if defined(__native_client__)
+	pthread_once(&nacl_init_guard, nacl_init);
+#endif
+
 	if (threads_count == 0) {
 		threads_count = (size_t) sysconf(_SC_NPROCESSORS_ONLN);
 	}
