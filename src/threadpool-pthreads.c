@@ -52,10 +52,12 @@ static inline size_t min(size_t a, size_t b) {
 	return a < b ? a : b;
 }
 
-enum thread_state {
-	thread_state_idle,
-	thread_state_compute_1d,
-	thread_state_shutdown,
+#define THREADPOOL_COMMAND_MASK UINT32_C(0x7FFFFFFF)
+
+enum threadpool_command {
+	threadpool_command_init,
+	threadpool_command_compute_1d,
+	threadpool_command_shutdown,
 };
 
 struct PTHREADPOOL_CACHELINE_ALIGNED thread_info {
@@ -76,10 +78,6 @@ struct PTHREADPOOL_CACHELINE_ALIGNED thread_info {
 	 * The stealing worker thread must decrement this value before decrementing @a range_end.
 	 */
 	volatile size_t range_length;
-	/**
-	 * The active state of the thread.
-	 */
-	volatile enum thread_state state;
 	/**
 	 * Thread number in the 0..threads_count-1 range.
 	 */
@@ -103,6 +101,10 @@ struct PTHREADPOOL_CACHELINE_ALIGNED pthreadpool {
 	 */
 	volatile size_t active_threads;
 	/**
+	 * The last command submitted to the thread pool.
+	 */
+	volatile uint32_t command;
+	/**
 	 * The function to call for each item.
 	 */
 	volatile void* function;
@@ -119,17 +121,17 @@ struct PTHREADPOOL_CACHELINE_ALIGNED pthreadpool {
 	 */
 	pthread_mutex_t completion_mutex;
 	/**
-	 * Condition variable to wait until all threads complete an operation.
+	 * Condition variable to wait until all threads complete an operation (until @a active_threads is zero).
 	 */
 	pthread_cond_t completion_condvar;
 	/**
-	 * Guards access to the @a state variables.
+	 * Guards access to the @a command variable.
 	 */
-	pthread_mutex_t state_mutex;
+	pthread_mutex_t command_mutex;
 	/**
-	 * Condition variable to wait for change of @a state variable.
+	 * Condition variable to wait for change of the @a command variable.
 	 */
-	pthread_cond_t state_condvar;
+	pthread_cond_t command_condvar;
 	/**
 	 * The number of threads in the thread pool. Never changes after initialization.
 	 */
@@ -188,11 +190,9 @@ static void thread_compute_1d(struct pthreadpool* threadpool, struct thread_info
 		const size_t threads_count = threadpool->threads_count;
 		for (size_t tid = (thread_number + 1) % threads_count; tid != thread_number; tid = (tid + 1) % threads_count) {
 			struct thread_info* other_thread = &threadpool->threads[tid];
-			if (other_thread->state != thread_state_idle) {
-				while (atomic_decrement(&other_thread->range_length)) {
-					const size_t item_id = __sync_sub_and_fetch(&other_thread->range_end, 1);
-					function(argument, item_id);
-				}
+			while (atomic_decrement(&other_thread->range_length)) {
+				const size_t item_id = __sync_sub_and_fetch(&other_thread->range_end, 1);
+				function(argument, item_id);
 			}
 		}
 	}
@@ -201,35 +201,38 @@ static void thread_compute_1d(struct pthreadpool* threadpool, struct thread_info
 static void* thread_main(void* arg) {
 	struct thread_info* thread = (struct thread_info*) arg;
 	struct pthreadpool* threadpool = ((struct pthreadpool*) (thread - thread->thread_number)) - 1;
+	uint32_t last_command = threadpool_command_init;
 
 	/* Check in */
 	checkin_worker_thread(threadpool);
 
-	/* Monitor the state changes and act accordingly */
+	/* Monitor news commands and act accordingly */
 	for (;;) {
-		/* Lock the state mutex */
-		pthread_mutex_lock(&threadpool->state_mutex);
-		/* Read the state */
-		enum thread_state state;
-		while ((state = thread->state) == thread_state_idle) {
-			/* Wait for state change */
-			pthread_cond_wait(&threadpool->state_condvar, &threadpool->state_mutex);
+		/* Lock the command mutex */
+		pthread_mutex_lock(&threadpool->command_mutex);
+		/* Read the command */
+		uint32_t command;
+		while ((command = threadpool->command) == last_command) {
+			/* Wait for new command */
+			pthread_cond_wait(&threadpool->command_condvar, &threadpool->command_mutex);
 		}
-		/* Read non-idle state */
-		pthread_mutex_unlock(&threadpool->state_mutex);
-		switch (state) {
-			case thread_state_compute_1d:
+		/* Read a new command */
+		pthread_mutex_unlock(&threadpool->command_mutex);
+		switch (command & THREADPOOL_COMMAND_MASK) {
+			case threadpool_command_compute_1d:
 				thread_compute_1d(threadpool, thread);
 				break;
-			case thread_state_shutdown:
+			case threadpool_command_shutdown:
+				/* Exit immediately: the master thread is waiting on pthread_join */
 				return NULL;
-			case thread_state_idle:
+			case threadpool_command_init:
 				/* To inhibit compiler warning */
 				break;
 		}
 		/* Notify the master thread that we finished processing */
-		thread->state = thread_state_idle;
 		checkin_worker_thread(threadpool);
+		/* Update last command */
+		last_command = command;
 	};
 }
 
@@ -255,8 +258,8 @@ struct pthreadpool* pthreadpool_create(size_t threads_count) {
 	pthread_mutex_init(&threadpool->execution_mutex, NULL);
 	pthread_mutex_init(&threadpool->completion_mutex, NULL);
 	pthread_cond_init(&threadpool->completion_condvar, NULL);
-	pthread_mutex_init(&threadpool->state_mutex, NULL);
-	pthread_cond_init(&threadpool->state_condvar, NULL);
+	pthread_mutex_init(&threadpool->command_mutex, NULL);
+	pthread_cond_init(&threadpool->command_condvar, NULL);
 
 	threadpool->active_threads = threadpool->threads_count;
 
@@ -289,14 +292,14 @@ void pthreadpool_compute_1d(
 		/* Protect the global threadpool structures */
 		pthread_mutex_lock(&threadpool->execution_mutex);
 
-		/* Lock the state variables to ensure that threads don't start processing before they observe complete state */
-		pthread_mutex_lock(&threadpool->state_mutex);
+		/* Lock the command variables to ensure that threads don't start processing before they observe complete command with all arguments */
+		pthread_mutex_lock(&threadpool->command_mutex);
 
 		/* Setup global arguments */
 		threadpool->function = function;
 		threadpool->argument = argument;
 
-		/* Locking of completion_mutex not needed: readers are sleeping on state_condvar */
+		/* Locking of completion_mutex not needed: readers are sleeping on command_condvar */
 		threadpool->active_threads = threadpool->threads_count;
 
 		/* Spread the work between threads */
@@ -305,14 +308,22 @@ void pthreadpool_compute_1d(
 			thread->range_start = multiply_divide(range, tid, threadpool->threads_count);
 			thread->range_end = multiply_divide(range, tid + 1, threadpool->threads_count);
 			thread->range_length = thread->range_end - thread->range_start;
-			thread->state = thread_state_compute_1d;
 		}
 
-		/* Unlock the state variables before waking up the threads for better performance */
-		pthread_mutex_unlock(&threadpool->state_mutex);
+		/*
+		 * Update the threadpool command.
+		 * Imporantly, do it after initializing command parameters (range, function, argument)
+		 * ~(threadpool->command | THREADPOOL_COMMAND_MASK) flips the bits not in command mask
+		 * to ensure the unmasked command is different then the last command, because worker threads
+		 * monitor for change in the unmasked command.
+		 */
+		threadpool->command = ~(threadpool->command | THREADPOOL_COMMAND_MASK) | threadpool_command_compute_1d;
+
+		/* Unlock the command variables before waking up the threads for better performance */
+		pthread_mutex_unlock(&threadpool->command_mutex);
 
 		/* Wake up the threads */
-		pthread_cond_broadcast(&threadpool->state_condvar);
+		pthread_cond_broadcast(&threadpool->command_condvar);
 
 		/* Wait until the threads finish computation */
 		wait_worker_threads(threadpool);
@@ -455,34 +466,32 @@ void pthreadpool_compute_2d_tiled(
 
 void pthreadpool_destroy(struct pthreadpool* threadpool) {
 	if (threadpool != NULL) {
-		/* Lock the state variables to ensure that threads don't start processing before they observe complete state */
-		pthread_mutex_lock(&threadpool->state_mutex);
+		/* Lock the command variable to ensure that threads don't shutdown until both command and active_threads are updated */
+		pthread_mutex_lock(&threadpool->command_mutex);
 
-		/* Locking of completion_mutex not needed: readers are sleeping on state_condvar */
+		/* Locking of completion_mutex not needed: readers are sleeping on command_condvar */
 		threadpool->active_threads = threadpool->threads_count;
 
-		/* Update threads' states */
-		for (size_t tid = 0; tid < threadpool->threads_count; tid++) {
-			threadpool->threads[tid].state = thread_state_shutdown;
-		}
+		/* Update the threadpool command. */
+		threadpool->command = threadpool_command_shutdown;
 
 		/* Wake up worker threads */
-		pthread_cond_broadcast(&threadpool->state_condvar);
+		pthread_cond_broadcast(&threadpool->command_condvar);
 
 		/* Commit the state changes and let workers start processing */
-		pthread_mutex_unlock(&threadpool->state_mutex);
+		pthread_mutex_unlock(&threadpool->command_mutex);
 
 		/* Wait until all threads return */
-		for (size_t tid = 0; tid < threadpool->threads_count; tid++) {
-			pthread_join(threadpool->threads[tid].thread_object, NULL);
+		for (size_t thread = 0; thread < threadpool->threads_count; thread++) {
+			pthread_join(threadpool->threads[thread].thread_object, NULL);
 		}
 
 		/* Release resources */
 		pthread_mutex_destroy(&threadpool->execution_mutex);
 		pthread_mutex_destroy(&threadpool->completion_mutex);
 		pthread_cond_destroy(&threadpool->completion_condvar);
-		pthread_mutex_destroy(&threadpool->state_mutex);
-		pthread_cond_destroy(&threadpool->state_condvar);
+		pthread_mutex_destroy(&threadpool->command_mutex);
+		pthread_cond_destroy(&threadpool->command_condvar);
 		free(threadpool);
 	}
 }
