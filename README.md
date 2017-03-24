@@ -11,8 +11,8 @@ Is is intended to provide functionality of `#pragma omp parallel for` for POSIX 
 * C interface (C++-compatible).
 * Run on user-specified or auto-detected number of threads.
 * Work-stealing scheduling for efficient work balancing.
-* Can be used in Portable Native Client and Native Client environment.
-* Extensive unit tests based on **Google Test**.
+* Compatible with Linux, macOS, and Native Client environments.
+* Covered with unit tests and microbenchmarks.
 
 ## Example
 
