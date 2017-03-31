@@ -13,6 +13,14 @@
 	#define PTHREADPOOL_USE_FUTEX 1
 	#include <sys/syscall.h>
 	#include <linux/futex.h>
+
+	/* Old Android NDKs do not define SYS_futex and FUTEX_PRIVATE_FLAG */
+	#ifndef SYS_futex
+		#define SYS_futex __NR_futex
+	#endif
+	#ifndef FUTEX_PRIVATE_FLAG
+		#define FUTEX_PRIVATE_FLAG 128
+	#endif
 #elif defined(__native_client__)
 	#define PTHREADPOOL_USE_FUTEX 1
 	#include <irt.h>
@@ -67,12 +75,12 @@ static inline size_t min(size_t a, size_t b) {
 #if PTHREADPOOL_USE_FUTEX
 	#if defined(__linux__)
 		static int futex_wait(volatile uint32_t* address, uint32_t value) {
-			return syscall(SYS_futex, address, FUTEX_WAIT_PRIVATE, value,
+			return syscall(SYS_futex, address, FUTEX_WAIT | FUTEX_PRIVATE_FLAG, value,
 				NULL, NULL, 0);
 		}
 
 		static int futex_wake_all(volatile uint32_t* address) {
-			return syscall(SYS_futex, address, FUTEX_WAKE_PRIVATE, INT_MAX,
+			return syscall(SYS_futex, address, FUTEX_WAKE | FUTEX_PRIVATE_FLAG, INT_MAX,
 				NULL, NULL, 0);
 		}
 	#elif defined(__native_client__)
