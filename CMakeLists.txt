@@ -6,8 +6,8 @@ INCLUDE(GNUInstallDirs)
 PROJECT(pthreadpool LANGUAGES C CXX)
 
 # ---[ Options.
-OPTION(PTHREADPOOL_BUILD_TESTS "Build pthreadpool unit tests" OFF)
-OPTION(PTHREADPOOL_BUILD_BENCHMARKS "Build pthreadpool micro-benchmarks" OFF)
+OPTION(PTHREADPOOL_BUILD_TESTS "Build pthreadpool unit tests" ON)
+OPTION(PTHREADPOOL_BUILD_BENCHMARKS "Build pthreadpool micro-benchmarks" ON)
 
 # ---[ CMake options
 LIST(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)

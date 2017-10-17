@@ -2,6 +2,8 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.2 FATAL_ERROR)
 
 FUNCTION(BUILD_FXDIV)
   INCLUDE(ExternalProject)
+  SET(FXDIV_BUILD_TESTS OFF CACHE BOOL "")
+  SET(FXDIV_BUILD_BENCHMARKS OFF CACHE BOOL "")
   ExternalProject_Add(fxdiv
     GIT_REPOSITORY https://github.com/Maratyszcza/FXdiv.git
     GIT_TAG master
