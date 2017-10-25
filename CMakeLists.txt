@@ -21,7 +21,7 @@ SET(CONFU_DEPENDENCIES_BINARY_DIR ${CMAKE_BINARY_DIR}/deps
   CACHE PATH "Confu-style dependencies binary directory")
 
 IF(NOT TARGET fxdiv)
-  CONFIGURE_FILE(cmake/DownloadFXdiv.cmake fxdiv-download/CMakeLists.txt)
+  CONFIGURE_FILE(cmake/DownloadFXdiv.cmake "${CMAKE_BINARY_DIR}/fxdiv-download/CMakeLists.txt")
   EXECUTE_PROCESS(COMMAND "${CMAKE_COMMAND}" -G "${CMAKE_GENERATOR}" .
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/fxdiv-download")
   EXECUTE_PROCESS(COMMAND "${CMAKE_COMMAND}" --build .
@@ -29,7 +29,7 @@ IF(NOT TARGET fxdiv)
 ENDIF()
 
 IF(NOT TARGET gtest)
-  CONFIGURE_FILE(cmake/DownloadGoogleTest.cmake googletest-download/CMakeLists.txt)
+  CONFIGURE_FILE(cmake/DownloadGoogleTest.cmake "${CMAKE_BINARY_DIR}/googletest-download/CMakeLists.txt")
   EXECUTE_PROCESS(COMMAND "${CMAKE_COMMAND}" -G "${CMAKE_GENERATOR}" .
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/googletest-download")
   EXECUTE_PROCESS(COMMAND "${CMAKE_COMMAND}" --build .
@@ -37,7 +37,7 @@ IF(NOT TARGET gtest)
 ENDIF()
 
 IF(NOT TARGET benchmark)
-  CONFIGURE_FILE(cmake/DownloadGoogleBenchmark.cmake googlebenchmark-download/CMakeLists.txt)
+  CONFIGURE_FILE(cmake/DownloadGoogleBenchmark.cmake "${CMAKE_BINARY_DIR}/googlebenchmark-download/CMakeLists.txt")
   EXECUTE_PROCESS(COMMAND "${CMAKE_COMMAND}" -G "${CMAKE_GENERATOR}" .
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/googlebenchmark-download")
   EXECUTE_PROCESS(COMMAND "${CMAKE_COMMAND}" --build .
