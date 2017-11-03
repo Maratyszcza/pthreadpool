@@ -6,6 +6,7 @@ INCLUDE(GNUInstallDirs)
 PROJECT(pthreadpool C CXX)
 
 # ---[ Options.
+OPTION(PTHREADPOOL_BUILD_SHARED "Build pthreadpool as a shared library" OFF)
 OPTION(PTHREADPOOL_BUILD_TESTS "Build pthreadpool unit tests" ON)
 OPTION(PTHREADPOOL_BUILD_BENCHMARKS "Build pthreadpool micro-benchmarks" ON)
 
@@ -66,7 +67,11 @@ ENDIF()
 TARGET_INCLUDE_DIRECTORIES(pthreadpool_interface INTERFACE include)
 INSTALL(FILES include/pthreadpool.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
-ADD_LIBRARY(pthreadpool ${PTHREADPOOL_SRCS})
+IF(PTHREADPOOL_BUILD_SHARED)
+  ADD_LIBRARY(pthreadpool SHARED ${PTHREADPOOL_SRCS})
+ELSE()
+  ADD_LIBRARY(pthreadpool STATIC ${PTHREADPOOL_SRCS})
+ENDIF()
 TARGET_LINK_LIBRARIES(pthreadpool PUBLIC pthreadpool_interface)
 IF(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
   SET(CMAKE_THREAD_PREFER_PTHREAD TRUE)
