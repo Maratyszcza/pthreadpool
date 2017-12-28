@@ -368,7 +368,11 @@ struct pthreadpool* pthreadpool_create(size_t threads_count) {
 }
 
 size_t pthreadpool_get_threads_count(struct pthreadpool* threadpool) {
-	return threadpool->threads_count;
+	if (threadpool == NULL) {
+		return 1;
+	} else {
+		return threadpool->threads_count;
+	}
 }
 
 void pthreadpool_compute_1d(
