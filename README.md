@@ -4,7 +4,7 @@
 [![Build Status](https://img.shields.io/travis/Maratyszcza/pthreadpool.svg)](https://travis-ci.org/Maratyszcza/pthreadpool)
 
 **pthreadpool** is a pthread-based thread pool implementation.
-Is is intended to provide functionality of `#pragma omp parallel for` for POSIX systems where OpenMP is not available.
+It is intended to provide functionality of `#pragma omp parallel for` for POSIX systems where OpenMP is not available.
 
 ## Features:
 
