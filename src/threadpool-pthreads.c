@@ -370,7 +370,7 @@ static void* thread_main(void* arg) {
 	/* Check in */
 	checkin_worker_thread(threadpool);
 
-	/* Monitor news commands and act accordingly */
+	/* Monitor new commands and act accordingly */
 	for (;;) {
 		uint32_t command = wait_for_new_command(threadpool, last_command);
 
