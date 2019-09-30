@@ -275,6 +275,32 @@ static void thread_compute_1d(struct pthreadpool* threadpool, struct thread_info
 	}
 }
 
+static uint32_t wait_for_new_command(
+	struct pthreadpool* threadpool,
+	uint32_t last_command)
+{
+	#if PTHREADPOOL_USE_FUTEX
+		uint32_t command;
+		while ((command = threadpool->command) == last_command) {
+			futex_wait(&threadpool->command, last_command);
+		}
+		return command;
+	#else
+		/* Lock the command mutex */
+		pthread_mutex_lock(&threadpool->command_mutex);
+		/* Read the command */
+		uint32_t command;
+		while ((command = threadpool->command) == last_command) {
+			/* Wait for new command */
+			pthread_cond_wait(&threadpool->command_condvar, &threadpool->command_mutex);
+		}
+		/* Read a new command */
+		pthread_mutex_unlock(&threadpool->command_mutex);
+
+		return command;
+	#endif
+}
+
 static void* thread_main(void* arg) {
 	struct thread_info* thread = (struct thread_info*) arg;
 	struct pthreadpool* threadpool = ((struct pthreadpool*) (thread - thread->thread_number)) - 1;
@@ -285,22 +311,7 @@ static void* thread_main(void* arg) {
 
 	/* Monitor news commands and act accordingly */
 	for (;;) {
-		uint32_t command;
-		#if PTHREADPOOL_USE_FUTEX
-			while ((command = threadpool->command) == last_command) {
-				futex_wait(&threadpool->command, last_command);
-			}
-		#else
-			/* Lock the command mutex */
-			pthread_mutex_lock(&threadpool->command_mutex);
-			/* Read the command */
-			while ((command = threadpool->command) == last_command) {
-				/* Wait for new command */
-				pthread_cond_wait(&threadpool->command_condvar, &threadpool->command_mutex);
-			}
-			/* Read a new command */
-			pthread_mutex_unlock(&threadpool->command_mutex);
-		#endif
+		uint32_t command = wait_for_new_command(threadpool, last_command);
 
 		/* Process command */
 		switch (command & THREADPOOL_COMMAND_MASK) {
@@ -321,6 +332,27 @@ static void* thread_main(void* arg) {
 	};
 }
 
+static struct pthreadpool* pthreadpool_allocate(size_t threads_count) {
+	const size_t threadpool_size = sizeof(struct pthreadpool) + threads_count * sizeof(struct thread_info);
+	struct pthreadpool* threadpool = NULL;
+	#if defined(__ANDROID__)
+		/*
+		 * Android didn't get posix_memalign until API level 17 (Android 4.2).
+		 * Use (otherwise obsolete) memalign function on Android platform.
+		 */
+		threadpool = memalign(PTHREADPOOL_CACHELINE_SIZE, threadpool_size);
+		if (threadpool == NULL) {
+			return NULL;
+		}
+	#else
+		if (posix_memalign((void**) &threadpool, PTHREADPOOL_CACHELINE_SIZE, threadpool_size) != 0) {
+			return NULL;
+		}
+	#endif
+	memset(threadpool, 0, sizeof(struct pthreadpool) + threads_count * sizeof(struct thread_info));
+	return threadpool;
+}
+
 struct pthreadpool* pthreadpool_create(size_t threads_count) {
 #if defined(__native_client__)
 	pthread_once(&nacl_init_guard, nacl_init);
@@ -329,20 +361,10 @@ struct pthreadpool* pthreadpool_create(size_t threads_count) {
 	if (threads_count == 0) {
 		threads_count = (size_t) sysconf(_SC_NPROCESSORS_ONLN);
 	}
-#if !defined(__ANDROID__)
-	struct pthreadpool* threadpool = NULL;
-	if (posix_memalign((void**) &threadpool, 64, sizeof(struct pthreadpool) + threads_count * sizeof(struct thread_info)) != 0) {
-#else
-	/*
-	 * Android didn't get posix_memalign until API level 17 (Android 4.2).
-	 * Use (otherwise obsolete) memalign function on Android platform.
-	 */
-	struct pthreadpool* threadpool = memalign(64, sizeof(struct pthreadpool) + threads_count * sizeof(struct thread_info));
+	struct pthreadpool* threadpool = pthreadpool_allocate(threads_count);
 	if (threadpool == NULL) {
-#endif
 		return NULL;
 	}
-	memset(threadpool, 0, sizeof(struct pthreadpool) + threads_count * sizeof(struct thread_info));
 	threadpool->threads_count = threads_count;
 	pthread_mutex_init(&threadpool->execution_mutex, NULL);
 #if !PTHREADPOOL_USE_FUTEX
