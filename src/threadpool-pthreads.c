@@ -233,20 +233,37 @@ static void checkin_worker_thread(struct pthreadpool* threadpool) {
 }
 
 static void wait_worker_threads(struct pthreadpool* threadpool) {
+	/* Initial check */
+	const uint32_t active_threads = threadpool->active_threads;
+	if (active_threads == 0) {
+		__sync_synchronize();
+		return;
+	}
+
+	/* Spin-wait */
+	for (uint32_t i = 0; i < PTHREADPOOL_SPIN_WAIT_ITERATIONS; i++) {
+		__sync_synchronize();
+		const uint32_t active_threads = threadpool->active_threads;
+		if (active_threads == 0) {
+			__sync_synchronize();
+			return;
+		}
+	}
+
+	/* Fall-back to mutex/futex wait */
 	#if PTHREADPOOL_USE_FUTEX
 		uint32_t has_active_threads;
 		while ((has_active_threads = threadpool->has_active_threads) != 0) {
 			futex_wait(&threadpool->has_active_threads, 1);
 		}
 	#else
-		if (threadpool->active_threads != 0) {
-			pthread_mutex_lock(&threadpool->completion_mutex);
-			while (threadpool->active_threads != 0) {
-				pthread_cond_wait(&threadpool->completion_condvar, &threadpool->completion_mutex);
-			};
-			pthread_mutex_unlock(&threadpool->completion_mutex);
-		}
+		pthread_mutex_lock(&threadpool->completion_mutex);
+		while (threadpool->active_threads != 0) {
+			pthread_cond_wait(&threadpool->completion_condvar, &threadpool->completion_mutex);
+		};
+		pthread_mutex_unlock(&threadpool->completion_mutex);
 	#endif
+	__sync_synchronize();
 }
 
 inline static bool atomic_decrement(volatile size_t* value) {
