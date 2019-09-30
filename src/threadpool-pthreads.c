@@ -34,6 +34,9 @@
 /* Library header */
 #include <pthreadpool.h>
 
+/* Number of iterations in spin-wait loop before going into futex/mutex wait */
+#define PTHREADPOOL_SPIN_WAIT_ITERATIONS 1000000
+
 #define PTHREADPOOL_CACHELINE_SIZE 64
 #define PTHREADPOOL_CACHELINE_ALIGNED __attribute__((__aligned__(PTHREADPOOL_CACHELINE_SIZE)))
 
@@ -286,30 +289,52 @@ static void thread_compute_1d(struct pthreadpool* threadpool, struct thread_info
 	}
 }
 
+static uint32_t spin_wait_for_new_command(
+	struct pthreadpool* threadpool,
+	uint32_t last_command)
+{
+	uint32_t command = threadpool->command;
+	if (command != last_command) {
+		__sync_synchronize();
+		return command;
+	}
+	for (uint32_t i = 0; i < PTHREADPOOL_SPIN_WAIT_ITERATIONS; i++) {
+		__sync_synchronize();
+		command = threadpool->command;
+		if (command != last_command) {
+			__sync_synchronize();
+			return command;
+		}
+	}
+	return last_command;
+}
+
 static uint32_t wait_for_new_command(
 	struct pthreadpool* threadpool,
 	uint32_t last_command)
 {
-	#if PTHREADPOOL_USE_FUTEX
-		uint32_t command;
-		while ((command = threadpool->command) == last_command) {
-			futex_wait(&threadpool->command, last_command);
-		}
-		return command;
-	#else
-		/* Lock the command mutex */
-		pthread_mutex_lock(&threadpool->command_mutex);
-		/* Read the command */
-		uint32_t command;
-		while ((command = threadpool->command) == last_command) {
-			/* Wait for new command */
-			pthread_cond_wait(&threadpool->command_condvar, &threadpool->command_mutex);
-		}
-		/* Read a new command */
-		pthread_mutex_unlock(&threadpool->command_mutex);
-
-		return command;
-	#endif
+	uint32_t command = spin_wait_for_new_command(threadpool, last_command);
+	if (command == last_command) {
+		/* Spin-wait timed out, fall back to mutex/futex wait */
+		#if PTHREADPOOL_USE_FUTEX
+			do {
+				futex_wait(&threadpool->command, last_command);
+				command = threadpool->command;
+			} while (command == last_command);
+		#else
+			/* Lock the command mutex */
+			pthread_mutex_lock(&threadpool->command_mutex);
+			/* Read the command */
+			while ((command = threadpool->command) == last_command) {
+				/* Wait for new command */
+				pthread_cond_wait(&threadpool->command_condvar, &threadpool->command_mutex);
+			}
+			/* Read a new command */
+			pthread_mutex_unlock(&threadpool->command_mutex);
+		#endif
+		__sync_synchronize();
+	}
+	return command;
 }
 
 static void* thread_main(void* arg) {
