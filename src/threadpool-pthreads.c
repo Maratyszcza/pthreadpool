@@ -252,6 +252,16 @@ inline static bool atomic_decrement(volatile size_t* value) {
 	return actual_value != 0;
 }
 
+inline static size_t modulo_increment(uint32_t i, uint32_t n) {
+	/* Increment input variable */
+	i = i + 1;
+	/* Wrap modulo n, if needed */
+	if (i == n) {
+		i = 0;
+	}
+	return i;
+}
+
 static void thread_compute_1d(struct pthreadpool* threadpool, struct thread_info* thread) {
 	const pthreadpool_function_1d_t function = (pthreadpool_function_1d_t) threadpool->function;
 	void *const argument = threadpool->argument;
@@ -264,7 +274,10 @@ static void thread_compute_1d(struct pthreadpool* threadpool, struct thread_info
 	/* There still may be other threads with work */
 	const size_t thread_number = thread->thread_number;
 	const size_t threads_count = threadpool->threads_count;
-	for (size_t tid = (thread_number + 1) % threads_count; tid != thread_number; tid = (tid + 1) % threads_count) {
+	for (size_t tid = modulo_increment(thread_number, threads_count);
+		tid != thread_number;
+		tid = modulo_increment(tid, threads_count))
+	{
 		struct thread_info* other_thread = &threadpool->threads[tid];
 		while (atomic_decrement(&other_thread->range_length)) {
 			const size_t item_id = __sync_sub_and_fetch(&other_thread->range_end, 1);
