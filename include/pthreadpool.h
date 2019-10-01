@@ -161,6 +161,9 @@ void pthreadpool_parallelize_6d_tile_2d(
  */
 void pthreadpool_destroy(pthreadpool_t threadpool);
 
+
+#ifndef PTHREADPOOL_NO_DEPRECATED_API
+
 /* Legacy API for compatibility with pre-existing users (e.g. NNPACK) */
 #if defined(__GNUC__)
 	#define PTHREADPOOL_DEPRECATED __attribute__((__deprecated__))
@@ -227,6 +230,8 @@ PTHREADPOOL_DEPRECATED void pthreadpool_compute_4d_tiled(
 	size_t tile_j,
 	size_t tile_k,
 	size_t tile_l);
+
+#endif /* PTHREADPOOL_NO_DEPRECATED_API */
 
 #ifdef __cplusplus
 } /* extern "C" */
