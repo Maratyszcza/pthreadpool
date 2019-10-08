@@ -47,7 +47,7 @@ static inline void disable_fpu_denormals() {
 	uint32_t fpscr;
 	__asm__ __volatile__(
 			"VMRS %[fpscr], fpscr\n"
-			"ORR %[fpscr], 0x1000000\n"
+			"ORR %[fpscr], #0x1000000\n"
 			"VMSR fpscr, %[fpscr]\n"
 		: [fpscr] "=r" (fpscr));
 #elif defined(__aarch64__)
