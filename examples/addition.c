@@ -28,10 +28,11 @@ int main() {
 	printf("Created thread pool with %zu threads\n", threads_count);
 
 	struct array_addition_context context = { augend, addend, sum };
-	pthreadpool_compute_1d(threadpool,
-		(pthreadpool_function_1d_t) add_arrays,
+	pthreadpool_parallelize_1d(threadpool,
+		(pthreadpool_task_1d_t) add_arrays,
 		(void**) &context,
-		ARRAY_SIZE);
+		ARRAY_SIZE,
+		PTHREADPOOL_FLAG_DISABLE_DENORMALS /* flags */);
 
 	pthreadpool_destroy(threadpool);
 	threadpool = NULL;

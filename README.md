@@ -3,16 +3,19 @@
 [![BSD (2 clause) License](https://img.shields.io/badge/License-BSD%202--Clause%20%22Simplified%22%20License-blue.svg)](https://github.com/Maratyszcza/pthreadpool/blob/master/LICENSE)
 [![Build Status](https://img.shields.io/travis/Maratyszcza/pthreadpool.svg)](https://travis-ci.org/Maratyszcza/pthreadpool)
 
-**pthreadpool** is a pthread-based thread pool implementation.
-It is intended to provide functionality of `#pragma omp parallel for` for POSIX systems where OpenMP is not available.
+**pthreadpool** is a portable and efficient thread pool implementation.
+It provides similar functionality to `#pragma omp parallel for`, but with additional features.
 
 ## Features:
 
 * C interface (C++-compatible).
+* 1D-6D loops with step parameters.
 * Run on user-specified or auto-detected number of threads.
 * Work-stealing scheduling for efficient work balancing.
-* Compatible with Linux, macOS, and Native Client environments.
-* Covered with unit tests and microbenchmarks.
+* Wait-free synchronization of work items.
+* Compatible with Linux (including Android), macOS, iOS, Emscripten, Native Client environments.
+* 100% unit tests coverage.
+* Throughput and latency microbenchmarks.
 
 ## Example
 
@@ -37,10 +40,11 @@ int main() {
   printf("Created thread pool with %zu threads\n", threads_count);
 
   struct array_addition_context context = { augend, addend, sum };
-  pthreadpool_compute_1d(threadpool,
-    (pthreadpool_function_1d_t) add_arrays,
+  pthreadpool_parallelize_1d(threadpool,
+    (pthreadpool_task_1d_t) add_arrays,
     (void**) &context,
-    ARRAY_SIZE);
+    ARRAY_SIZE,
+    PTHREADPOOL_FLAG_DISABLE_DENORMALS /* flags */);
   
   pthreadpool_destroy(threadpool);
   threadpool = NULL;
