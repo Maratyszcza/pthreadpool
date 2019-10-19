@@ -1,4 +1,4 @@
-dist: trusty
+dist: xenial
 language: c
 install:
  - git clone https://github.com/ninja-build/ninja.git /tmp/ninja
