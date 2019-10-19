@@ -24,39 +24,34 @@ MACRO(PTHREADPOOL_TARGET_ENABLE_C11 target)
 ENDMACRO()
 
 # ---[ Download deps
-SET(CONFU_DEPENDENCIES_SOURCE_DIR ${CMAKE_SOURCE_DIR}/deps
-  CACHE PATH "Confu-style dependencies source directory")
-SET(CONFU_DEPENDENCIES_BINARY_DIR ${CMAKE_BINARY_DIR}/deps
-  CACHE PATH "Confu-style dependencies binary directory")
-
 IF(NOT DEFINED FXDIV_SOURCE_DIR)
-  MESSAGE(STATUS "Downloading FXdiv to ${CONFU_DEPENDENCIES_SOURCE_DIR}/fxdiv (define FXDIV_SOURCE_DIR to avoid it)")
-  CONFIGURE_FILE(cmake/DownloadFXdiv.cmake "${CONFU_DEPENDENCIES_BINARY_DIR}/fxdiv-download/CMakeLists.txt")
+  MESSAGE(STATUS "Downloading FXdiv to ${CMAKE_BINARY_DIR}/FXdiv-source (define FXDIV_SOURCE_DIR to avoid it)")
+  CONFIGURE_FILE(cmake/DownloadFXdiv.cmake "${CMAKE_BINARY_DIR}/FXdiv-download/CMakeLists.txt")
   EXECUTE_PROCESS(COMMAND "${CMAKE_COMMAND}" -G "${CMAKE_GENERATOR}" .
-    WORKING_DIRECTORY "${CONFU_DEPENDENCIES_BINARY_DIR}/fxdiv-download")
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/FXdiv-download")
   EXECUTE_PROCESS(COMMAND "${CMAKE_COMMAND}" --build .
-    WORKING_DIRECTORY "${CONFU_DEPENDENCIES_BINARY_DIR}/fxdiv-download")
-  SET(FXDIV_SOURCE_DIR "${CONFU_DEPENDENCIES_SOURCE_DIR}/fxdiv" CACHE STRING "FXdiv source directory")
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/FXdiv-download")
+  SET(FXDIV_SOURCE_DIR "${CMAKE_BINARY_DIR}/FXdiv-source" CACHE STRING "FXdiv source directory")
 ENDIF()
 
 IF(PTHREADPOOL_BUILD_TESTS AND NOT DEFINED GOOGLETEST_SOURCE_DIR)
-  MESSAGE(STATUS "Downloading Google Test to ${CONFU_DEPENDENCIES_SOURCE_DIR}/googletest (define GOOGLETEST_SOURCE_DIR to avoid it)")
-  CONFIGURE_FILE(cmake/DownloadGoogleTest.cmake "${CONFU_DEPENDENCIES_BINARY_DIR}/googletest-download/CMakeLists.txt")
+  MESSAGE(STATUS "Downloading Google Test to ${CMAKE_BINARY_DIR}/googletest-source (define GOOGLETEST_SOURCE_DIR to avoid it)")
+  CONFIGURE_FILE(cmake/DownloadGoogleTest.cmake "${CMAKE_BINARY_DIR}/googletest-download/CMakeLists.txt")
   EXECUTE_PROCESS(COMMAND "${CMAKE_COMMAND}" -G "${CMAKE_GENERATOR}" .
-    WORKING_DIRECTORY "${CONFU_DEPENDENCIES_BINARY_DIR}/googletest-download")
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/googletest-download")
   EXECUTE_PROCESS(COMMAND "${CMAKE_COMMAND}" --build .
-    WORKING_DIRECTORY "${CONFU_DEPENDENCIES_BINARY_DIR}/googletest-download")
-  SET(GOOGLETEST_SOURCE_DIR "${CONFU_DEPENDENCIES_SOURCE_DIR}/googletest" CACHE STRING "Google Test source directory")
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/googletest-download")
+  SET(GOOGLETEST_SOURCE_DIR "${CMAKE_BINARY_DIR}/googletest-source" CACHE STRING "Google Test source directory")
 ENDIF()
 
 IF(PTHREADPOOL_BUILD_BENCHMARKS AND NOT DEFINED GOOGLEBENCHMARK_SOURCE_DIR)
-  MESSAGE(STATUS "Downloading Google Benchmark to ${CONFU_DEPENDENCIES_SOURCE_DIR}/googlebenchmark (define GOOGLEBENCHMARK_SOURCE_DIR to avoid it)")
-  CONFIGURE_FILE(cmake/DownloadGoogleBenchmark.cmake "${CONFU_DEPENDENCIES_BINARY_DIR}/googlebenchmark-download/CMakeLists.txt")
+  MESSAGE(STATUS "Downloading Google Benchmark to ${CMAKE_BINARY_DIR}/googlebenchmark-source (define GOOGLEBENCHMARK_SOURCE_DIR to avoid it)")
+  CONFIGURE_FILE(cmake/DownloadGoogleBenchmark.cmake "${CMAKE_BINARY_DIR}/googlebenchmark-download/CMakeLists.txt")
   EXECUTE_PROCESS(COMMAND "${CMAKE_COMMAND}" -G "${CMAKE_GENERATOR}" .
-    WORKING_DIRECTORY "${CONFU_DEPENDENCIES_BINARY_DIR}/googlebenchmark-download")
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/googlebenchmark-download")
   EXECUTE_PROCESS(COMMAND "${CMAKE_COMMAND}" --build .
-    WORKING_DIRECTORY "${CONFU_DEPENDENCIES_BINARY_DIR}/googlebenchmark-download")
-  SET(GOOGLEBENCHMARK_SOURCE_DIR "${CONFU_DEPENDENCIES_SOURCE_DIR}/googlebenchmark" CACHE STRING "Google Benchmark source directory")
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/googlebenchmark-download")
+  SET(GOOGLEBENCHMARK_SOURCE_DIR "${CMAKE_BINARY_DIR}/googlebenchmark-source" CACHE STRING "Google Benchmark source directory")
 ENDIF()
 
 # ---[ pthreadpool library
@@ -116,7 +111,7 @@ IF(NOT TARGET fxdiv)
   SET(FXDIV_BUILD_BENCHMARKS OFF CACHE BOOL "")
   ADD_SUBDIRECTORY(
     "${FXDIV_SOURCE_DIR}"
-    "${CONFU_DEPENDENCIES_BINARY_DIR}/fxdiv")
+    "${CMAKE_BINARY_DIR}/FXdiv")
 ENDIF()
 TARGET_LINK_LIBRARIES(pthreadpool PRIVATE fxdiv)
 
@@ -130,7 +125,7 @@ IF(PTHREADPOOL_BUILD_TESTS)
     SET(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
     ADD_SUBDIRECTORY(
       "${GOOGLETEST_SOURCE_DIR}"
-      "${CONFU_DEPENDENCIES_BINARY_DIR}/googletest")
+      "${CMAKE_BINARY_DIR}/googletest")
   ENDIF()
 
   ADD_EXECUTABLE(pthreadpool-test test/pthreadpool.cc)
@@ -144,7 +139,7 @@ IF(PTHREADPOOL_BUILD_BENCHMARKS)
     SET(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "")
     ADD_SUBDIRECTORY(
       "${GOOGLEBENCHMARK_SOURCE_DIR}"
-      "${CONFU_DEPENDENCIES_BINARY_DIR}/googlebenchmark")
+      "${CMAKE_BINARY_DIR}/googlebenchmark")
   ENDIF()
 
   ADD_EXECUTABLE(latency-bench bench/latency.cc)
