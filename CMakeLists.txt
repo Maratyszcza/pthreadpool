@@ -22,10 +22,10 @@ IF(PTHREADPOOL_BUILD_TESTS)
   ENABLE_TESTING()
 ENDIF()
 
-MACRO(PTHREADPOOL_TARGET_ENABLE_C11 target)
+MACRO(PTHREADPOOL_TARGET_ENABLE_CXX11 target)
   SET_TARGET_PROPERTIES(${target} PROPERTIES
-    C_STANDARD 11
-    C_EXTENSIONS NO)
+    CXX_STANDARD 11
+    CXX_EXTENSIONS NO)
 ENDMACRO()
 
 # ---[ Download deps
@@ -91,7 +91,9 @@ ELSE()
   MESSAGE(FATAL_ERROR "Unsupported library type ${PTHREADPOOL_LIBRARY_TYPE}")
 ENDIF()
 
-PTHREADPOOL_TARGET_ENABLE_C11(pthreadpool)
+SET_TARGET_PROPERTIES(pthreadpool PROPERTIES
+  C_STANDARD 11
+  C_EXTENSIONS NO)
 TARGET_LINK_LIBRARIES(pthreadpool PUBLIC pthreadpool_interface)
 TARGET_INCLUDE_DIRECTORIES(pthreadpool PRIVATE src)
 IF(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
@@ -134,6 +136,9 @@ IF(PTHREADPOOL_BUILD_TESTS)
   ENDIF()
 
   ADD_EXECUTABLE(pthreadpool-test test/pthreadpool.cc)
+  SET_TARGET_PROPERTIES(pthreadpool-test PROPERTIES
+    CXX_STANDARD 11
+    CXX_EXTENSIONS NO)
   TARGET_LINK_LIBRARIES(pthreadpool-test pthreadpool gtest gtest_main)
   ADD_TEST(pthreadpool pthreadpool-test)
 ENDIF()
@@ -148,8 +153,14 @@ IF(PTHREADPOOL_BUILD_BENCHMARKS)
   ENDIF()
 
   ADD_EXECUTABLE(latency-bench bench/latency.cc)
+  SET_TARGET_PROPERTIES(latency-bench PROPERTIES
+    CXX_STANDARD 11
+    CXX_EXTENSIONS NO)
   TARGET_LINK_LIBRARIES(latency-bench pthreadpool benchmark)
 
   ADD_EXECUTABLE(throughput-bench bench/throughput.cc)
+  SET_TARGET_PROPERTIES(throughput-bench PROPERTIES
+    CXX_STANDARD 11
+    CXX_EXTENSIONS NO)
   TARGET_LINK_LIBRARIES(throughput-bench pthreadpool benchmark)
 ENDIF()
