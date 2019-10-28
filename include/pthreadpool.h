@@ -171,43 +171,43 @@ void pthreadpool_destroy(pthreadpool_t threadpool);
 	#define PTHREADPOOL_DEPRECATED
 #endif
 
-typedef PTHREADPOOL_DEPRECATED void (*pthreadpool_function_1d_t)(void*, size_t);
-typedef PTHREADPOOL_DEPRECATED void (*pthreadpool_function_1d_tiled_t)(void*, size_t, size_t);
-typedef PTHREADPOOL_DEPRECATED void (*pthreadpool_function_2d_t)(void*, size_t, size_t);
-typedef PTHREADPOOL_DEPRECATED void (*pthreadpool_function_2d_tiled_t)(void*, size_t, size_t, size_t, size_t);
-typedef PTHREADPOOL_DEPRECATED void (*pthreadpool_function_3d_tiled_t)(void*, size_t, size_t, size_t, size_t, size_t, size_t);
-typedef PTHREADPOOL_DEPRECATED void (*pthreadpool_function_4d_tiled_t)(void*, size_t, size_t, size_t, size_t, size_t, size_t, size_t, size_t);
+typedef void (*pthreadpool_function_1d_t)(void*, size_t) PTHREADPOOL_DEPRECATED;
+typedef void (*pthreadpool_function_1d_tiled_t)(void*, size_t, size_t) PTHREADPOOL_DEPRECATED;
+typedef void (*pthreadpool_function_2d_t)(void*, size_t, size_t) PTHREADPOOL_DEPRECATED;
+typedef void (*pthreadpool_function_2d_tiled_t)(void*, size_t, size_t, size_t, size_t) PTHREADPOOL_DEPRECATED;
+typedef void (*pthreadpool_function_3d_tiled_t)(void*, size_t, size_t, size_t, size_t, size_t, size_t) PTHREADPOOL_DEPRECATED;
+typedef void (*pthreadpool_function_4d_tiled_t)(void*, size_t, size_t, size_t, size_t, size_t, size_t, size_t, size_t) PTHREADPOOL_DEPRECATED;
 
-PTHREADPOOL_DEPRECATED void pthreadpool_compute_1d(
+void pthreadpool_compute_1d(
 	pthreadpool_t threadpool,
 	pthreadpool_function_1d_t function,
 	void* argument,
-	size_t range);
+	size_t range) PTHREADPOOL_DEPRECATED;
 
-PTHREADPOOL_DEPRECATED void pthreadpool_compute_1d_tiled(
+void pthreadpool_compute_1d_tiled(
 	pthreadpool_t threadpool,
 	pthreadpool_function_1d_tiled_t function,
 	void* argument,
 	size_t range,
-	size_t tile);
+	size_t tile) PTHREADPOOL_DEPRECATED;
 
-PTHREADPOOL_DEPRECATED void pthreadpool_compute_2d(
+void pthreadpool_compute_2d(
 	pthreadpool_t threadpool,
 	pthreadpool_function_2d_t function,
 	void* argument,
 	size_t range_i,
-	size_t range_j);
+	size_t range_j) PTHREADPOOL_DEPRECATED;
 
-PTHREADPOOL_DEPRECATED void pthreadpool_compute_2d_tiled(
+void pthreadpool_compute_2d_tiled(
 	pthreadpool_t threadpool,
 	pthreadpool_function_2d_tiled_t function,
 	void* argument,
 	size_t range_i,
 	size_t range_j,
 	size_t tile_i,
-	size_t tile_j);
+	size_t tile_j) PTHREADPOOL_DEPRECATED;
 
-PTHREADPOOL_DEPRECATED void pthreadpool_compute_3d_tiled(
+void pthreadpool_compute_3d_tiled(
 	pthreadpool_t threadpool,
 	pthreadpool_function_3d_tiled_t function,
 	void* argument,
@@ -216,9 +216,9 @@ PTHREADPOOL_DEPRECATED void pthreadpool_compute_3d_tiled(
 	size_t range_k,
 	size_t tile_i,
 	size_t tile_j,
-	size_t tile_k);
+	size_t tile_k) PTHREADPOOL_DEPRECATED;
 
-PTHREADPOOL_DEPRECATED void pthreadpool_compute_4d_tiled(
+void pthreadpool_compute_4d_tiled(
 	pthreadpool_t threadpool,
 	pthreadpool_function_4d_tiled_t function,
 	void* argument,
@@ -229,7 +229,7 @@ PTHREADPOOL_DEPRECATED void pthreadpool_compute_4d_tiled(
 	size_t tile_i,
 	size_t tile_j,
 	size_t tile_k,
-	size_t tile_l);
+	size_t tile_l) PTHREADPOOL_DEPRECATED;
 
 #endif /* PTHREADPOOL_NO_DEPRECATED_API */
 
