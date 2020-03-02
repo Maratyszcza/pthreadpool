@@ -31,6 +31,12 @@
 	#endif
 #endif
 
+#ifdef _WIN32
+#	define NOMINMAX
+#	include <sysinfoapi.h>
+#	include <malloc.h>
+#endif
+
 /* Dependencies */
 #include <fxdiv.h>
 
@@ -424,6 +430,11 @@ static struct pthreadpool* pthreadpool_allocate(size_t threads_count) {
 		if (threadpool == NULL) {
 			return NULL;
 		}
+	#elif defined(_WIN32)
+		threadpool = _aligned_malloc(threadpool_size, PTHREADPOOL_CACHELINE_SIZE);
+		if (threadpool == NULL) {
+			return NULL;
+		}
 	#else
 		if (posix_memalign((void**) &threadpool, PTHREADPOOL_CACHELINE_SIZE, threadpool_size) != 0) {
 			return NULL;
@@ -439,8 +450,18 @@ struct pthreadpool* pthreadpool_create(size_t threads_count) {
 #endif
 
 	if (threads_count == 0) {
-		threads_count = (size_t) sysconf(_SC_NPROCESSORS_ONLN);
+		#if defined(_SC_NPROCESSORS_ONLN)
+			threads_count = (size_t) sysconf(_SC_NPROCESSORS_ONLN);
+		#elif defined(_WIN32)
+			SYSTEM_INFO system_info;
+			ZeroMemory(&system_info, sizeof(system_info));
+			GetSystemInfo(&system_info);
+			threads_count = (size_t) system_info.dwNumberOfProcessors;
+		#else
+			#error "Unsupported platform"
+		#endif
 	}
+
 	struct pthreadpool* threadpool = pthreadpool_allocate(threads_count);
 	if (threadpool == NULL) {
 		return NULL;
@@ -1204,6 +1225,10 @@ void pthreadpool_destroy(struct pthreadpool* threadpool) {
 				pthread_cond_destroy(&threadpool->command_condvar);
 			#endif
 		}
-		free(threadpool);
+		#ifdef _WIN32
+			_aligned_free(threadpool);
+		#else
+			free(threadpool);
+		#endif
 	}
 }

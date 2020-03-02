@@ -4,9 +4,10 @@
 
 #include <pthreadpool.h>
 
+#include <thread>
 
 static void SetNumberOfThreads(benchmark::internal::Benchmark* benchmark) {
-	const int max_threads = sysconf(_SC_NPROCESSORS_ONLN);
+	const int max_threads = std::thread::hardware_concurrency();
 	for (int t = 1; t <= max_threads; t++) {
 		benchmark->Arg(t);
 	}
