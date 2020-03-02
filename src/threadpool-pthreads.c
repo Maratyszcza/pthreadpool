@@ -449,15 +449,15 @@ struct pthreadpool* pthreadpool_create(size_t threads_count) {
 #endif
 
 	if (threads_count == 0) {
-#if defined(_SC_NPROCESSORS_ONLN)
-		threads_count = (size_t) sysconf(_SC_NPROCESSORS_ONLN);
-#elif defined(_WIN32)
-		SYSTEM_INFO system_info;
-		ZeroMemory(&system_info, sizeof(system_info));
-		GetSystemInfo(&system_info);
-		threads_count = (size_t) system_info.dwNumberOfProcessors;
+#		if defined(_SC_NPROCESSORS_ONLN)
+			threads_count = (size_t) sysconf(_SC_NPROCESSORS_ONLN);
+#		elif defined(_WIN32)
+			SYSTEM_INFO system_info;
+			ZeroMemory(&system_info, sizeof(system_info));
+			GetSystemInfo(&system_info);
+			threads_count = (size_t) system_info.dwNumberOfProcessors;
 #else
-	#error "Unsupported platform"
+		#error "Unsupported platform"
 #endif
 	}
 
@@ -1225,9 +1225,9 @@ void pthreadpool_destroy(struct pthreadpool* threadpool) {
 			#endif
 		}
 		#ifdef _WIN32
-		_aligned_free(threadpool);
+			_aligned_free(threadpool);
 		#else
-		free(threadpool);
+			free(threadpool);
 		#endif
 	}
 }
