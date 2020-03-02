@@ -32,8 +32,8 @@
 #endif
 
 #ifdef _WIN32
+#	define NOMINMAX
 #	include <sysinfoapi.h>
-#	undef min
 #endif
 
 /* Dependencies */
@@ -448,16 +448,19 @@ struct pthreadpool* pthreadpool_create(size_t threads_count) {
 	pthread_once(&nacl_init_guard, nacl_init);
 #endif
 
-#if defined(_SC_NPROCESSORS_ONLN)
 	if (threads_count == 0) {
+#if defined(_SC_NPROCESSORS_ONLN)
 		threads_count = (size_t) sysconf(_SC_NPROCESSORS_ONLN);
-	}
 #elif defined(_WIN32)
-	SYSTEM_INFO system_info;
-	ZeroMemory(&system_info, sizeof(system_info));
-	GetSystemInfo(&system_info);
-	threads_count = (size_t) system_info.dwNumberOfProcessors;
+		SYSTEM_INFO system_info;
+		ZeroMemory(&system_info, sizeof(system_info));
+		GetSystemInfo(&system_info);
+		threads_count = (size_t) system_info.dwNumberOfProcessors;
+#else
+	#error "Unsupported platform"
 #endif
+	}
+
 	struct pthreadpool* threadpool = pthreadpool_allocate(threads_count);
 	if (threadpool == NULL) {
 		return NULL;
