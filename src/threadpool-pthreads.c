@@ -34,6 +34,7 @@
 #ifdef _WIN32
 #	define NOMINMAX
 #	include <sysinfoapi.h>
+#	include <malloc.h>
 #endif
 
 /* Dependencies */
