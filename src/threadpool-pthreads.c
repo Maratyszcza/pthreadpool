@@ -429,8 +429,8 @@ static struct pthreadpool* pthreadpool_allocate(size_t threads_count) {
 		if (threadpool == NULL) {
 			return NULL;
 		}
-    #elif defined(_WIN32)
-        threadpool = _aligned_malloc(threadpool_size, PTHREADPOOL_CACHELINE_SIZE);
+	#elif defined(_WIN32)
+		threadpool = _aligned_malloc(threadpool_size, PTHREADPOOL_CACHELINE_SIZE);
 		if (threadpool == NULL) {
 			return NULL;
 		}
