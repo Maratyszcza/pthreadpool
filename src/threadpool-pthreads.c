@@ -1224,6 +1224,10 @@ void pthreadpool_destroy(struct pthreadpool* threadpool) {
 				pthread_cond_destroy(&threadpool->command_condvar);
 			#endif
 		}
+		#ifdef _WIN32
+		_aligned_free(threadpool);
+		#else
 		free(threadpool);
+		#endif
 	}
 }
