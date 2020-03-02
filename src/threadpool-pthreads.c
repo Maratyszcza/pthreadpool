@@ -31,6 +31,11 @@
 	#endif
 #endif
 
+#ifdef _WIN32
+#	include <sysinfoapi.h>
+#	undef min
+#endif
+
 /* Dependencies */
 #include <fxdiv.h>
 
@@ -424,6 +429,11 @@ static struct pthreadpool* pthreadpool_allocate(size_t threads_count) {
 		if (threadpool == NULL) {
 			return NULL;
 		}
+    #elif defined(_WIN32)
+        threadpool = _aligned_malloc(threadpool_size, PTHREADPOOL_CACHELINE_SIZE);
+		if (threadpool == NULL) {
+			return NULL;
+		}
 	#else
 		if (posix_memalign((void**) &threadpool, PTHREADPOOL_CACHELINE_SIZE, threadpool_size) != 0) {
 			return NULL;
@@ -438,9 +448,16 @@ struct pthreadpool* pthreadpool_create(size_t threads_count) {
 	pthread_once(&nacl_init_guard, nacl_init);
 #endif
 
+#if defined(_SC_NPROCESSORS_ONLN)
 	if (threads_count == 0) {
 		threads_count = (size_t) sysconf(_SC_NPROCESSORS_ONLN);
 	}
+#elif defined(_WIN32)
+	SYSTEM_INFO system_info;
+	ZeroMemory(&system_info, sizeof(system_info));
+	GetSystemInfo(&system_info);
+	threads_count = (size_t) system_info.dwNumberOfProcessors;
+#endif
 	struct pthreadpool* threadpool = pthreadpool_allocate(threads_count);
 	if (threadpool == NULL) {
 		return NULL;

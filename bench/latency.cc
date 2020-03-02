@@ -4,9 +4,19 @@
 
 #include <pthreadpool.h>
 
+#ifdef _WIN32
+#	include <sysinfoapi.h>
+#endif
 
 static void SetNumberOfThreads(benchmark::internal::Benchmark* benchmark) {
+#ifdef _WIN32
+	SYSTEM_INFO system_info;
+	ZeroMemory(&system_info, sizeof(system_info));
+	GetSystemInfo(&system_info);
+	const int max_threads = (size_t) system_info.dwNumberOfProcessors;
+#else
 	const int max_threads = sysconf(_SC_NPROCESSORS_ONLN);
+#endif
 	for (int t = 1; t <= max_threads; t++) {
 		benchmark->Arg(t);
 	}
