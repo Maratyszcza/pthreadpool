@@ -1,7 +1,5 @@
 #include <benchmark/benchmark.h>
 
-#include <unistd.h>
-
 #include <pthreadpool.h>
 
 #include <thread>

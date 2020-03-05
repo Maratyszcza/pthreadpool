@@ -32,9 +32,9 @@
 #endif
 
 #ifdef _WIN32
-#	define NOMINMAX
-#	include <sysinfoapi.h>
-#	include <malloc.h>
+	#define NOMINMAX
+	#include <malloc.h>
+	#include <sysinfoapi.h>
 #endif
 
 /* Dependencies */
@@ -559,7 +559,7 @@ void pthreadpool_parallelize_1d(
 
 		#if PTHREADPOOL_USE_FUTEX
 			/*
-			 * Make new command parameters globally visible. Having this fence before updating the command is imporatnt: it
+			 * Make new command parameters globally visible. Having this fence before updating the command is important: it
 			 * guarantees that if a worker thread observes new command value, it also observes the updated command parameters.
 			 */
 			atomic_thread_fence(memory_order_release);
