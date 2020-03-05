@@ -17,6 +17,19 @@ typedef void (*pthreadpool_task_5d_tile_2d_t)(void*, size_t, size_t, size_t, siz
 typedef void (*pthreadpool_task_6d_tile_2d_t)(void*, size_t, size_t, size_t, size_t, size_t, size_t, size_t, size_t);
 
 
+/**
+ * Disable support for denormalized numbers to the maximum extent possible for the duration of the computation.
+ *
+ * Handling denormalized floating-point numbers is often implemented in microcode, and incurs significant performance
+ * degradation. This hint instructs the thread pool to disable support for denormalized numbers before running the
+ * computation by manipulating architecture-specific control registers, and restore the initial value of control
+ * registers after the computation is complete. The thread pool temporary disables denormalized numbers on all threads
+ * involved in the computation (i.e. the caller threads, and potentially worker threads).
+ *
+ * Disabling denormalized numbers may have a small negative effect on results' accuracy. As various architectures differ
+ * in capabilities to control processing of denormalized numbers, using this flag may also hurt results' reproducibility
+ * across different instruction set architectures.
+ */
 #define PTHREADPOOL_FLAG_DISABLE_DENORMALS 0x00000001
 
 #ifdef __cplusplus
