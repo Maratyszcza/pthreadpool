@@ -23,9 +23,6 @@
 		#ifndef FUTEX_PRIVATE_FLAG
 			#define FUTEX_PRIVATE_FLAG 128
 		#endif
-	#elif defined(__native_client__)
-		#define PTHREADPOOL_USE_FUTEX 1
-		#include <irt.h>
 	#else
 		#define PTHREADPOOL_USE_FUTEX 0
 	#endif
@@ -95,21 +92,6 @@ static inline size_t min(size_t a, size_t b) {
 
 		static int futex_wake_all(_Atomic uint32_t* address) {
 			return syscall(SYS_futex, address, FUTEX_WAKE | FUTEX_PRIVATE_FLAG, INT_MAX);
-		}
-	#elif defined(__native_client__)
-		static struct nacl_irt_futex nacl_irt_futex = { 0 };
-		static pthread_once_t nacl_init_guard = PTHREAD_ONCE_INIT;
-		static void nacl_init(void) {
-			nacl_interface_query(NACL_IRT_FUTEX_v0_1, &nacl_irt_futex, sizeof(nacl_irt_futex));
-		}
-
-		static int futex_wait(_Atomic uint32_t* address, uint32_t value) {
-			return nacl_irt_futex.futex_wait_abs((_Atomic int*) address, (int) value, NULL);
-		}
-
-		static int futex_wake_all(_Atomic uint32_t* address) {
-			int count;
-			return nacl_irt_futex.futex_wake((_Atomic int*) address, INT_MAX, &count);
 		}
 	#else
 		#error "Platform-specific implementation of futex_wait and futex_wake_all required"
@@ -449,10 +431,6 @@ static struct pthreadpool* pthreadpool_allocate(size_t threads_count) {
 }
 
 struct pthreadpool* pthreadpool_create(size_t threads_count) {
-#if defined(__native_client__)
-	pthread_once(&nacl_init_guard, nacl_init);
-#endif
-
 	if (threads_count == 0) {
 		#if defined(_SC_NPROCESSORS_ONLN)
 			threads_count = (size_t) sysconf(_SC_NPROCESSORS_ONLN);
