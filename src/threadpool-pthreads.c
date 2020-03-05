@@ -335,7 +335,8 @@ static void thread_parallelize_1d(struct pthreadpool* threadpool, struct thread_
 
 static uint32_t wait_for_new_command(
 	struct pthreadpool* threadpool,
-	uint32_t last_command)
+	uint32_t last_command,
+	uint32_t last_flags)
 {
 	uint32_t command = atomic_load_explicit(&threadpool->command, memory_order_relaxed);
 	if (command != last_command) {
@@ -343,19 +344,21 @@ static uint32_t wait_for_new_command(
 		return command;
 	}
 
-	/* Spin-wait loop */
-	for (uint32_t i = PTHREADPOOL_SPIN_WAIT_ITERATIONS; i != 0; i--) {
-		/* This fence serves as a sleep instruction */
-		atomic_thread_fence(memory_order_acquire);
-
-		command = atomic_load_explicit(&threadpool->command, memory_order_relaxed);
-		if (command != last_command) {
+	if ((last_flags & PTHREADPOOL_FLAG_YIELD_WORKERS) == 0) {
+		/* Spin-wait loop */
+		for (uint32_t i = PTHREADPOOL_SPIN_WAIT_ITERATIONS; i != 0; i--) {
+			/* This fence serves as a sleep instruction */
 			atomic_thread_fence(memory_order_acquire);
-			return command;
+
+			command = atomic_load_explicit(&threadpool->command, memory_order_relaxed);
+			if (command != last_command) {
+				atomic_thread_fence(memory_order_acquire);
+				return command;
+			}
 		}
 	}
 
-	/* Spin-wait timed out, fall back to mutex/futex wait */
+	/* Spin-wait disabled or timed out, fall back to mutex/futex wait */
 	#if PTHREADPOOL_USE_FUTEX
 		do {
 			futex_wait(&threadpool->command, last_command);
@@ -381,14 +384,15 @@ static void* thread_main(void* arg) {
 	struct pthreadpool* threadpool = ((struct pthreadpool*) (thread - thread->thread_number)) - 1;
 	uint32_t last_command = threadpool_command_init;
 	struct fpu_state saved_fpu_state = { 0 };
+	uint32_t flags = 0;
 
 	/* Check in */
 	checkin_worker_thread(threadpool);
 
 	/* Monitor new commands and act accordingly */
 	for (;;) {
-		uint32_t command = wait_for_new_command(threadpool, last_command);
-		const uint32_t flags = atomic_load_explicit(&threadpool->flags, memory_order_relaxed);
+		uint32_t command = wait_for_new_command(threadpool, last_command, flags);
+		flags = atomic_load_explicit(&threadpool->flags, memory_order_relaxed);
 
 		/* Process command */
 		switch (command & THREADPOOL_COMMAND_MASK) {

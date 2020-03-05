@@ -32,6 +32,15 @@ typedef void (*pthreadpool_task_6d_tile_2d_t)(void*, size_t, size_t, size_t, siz
  */
 #define PTHREADPOOL_FLAG_DISABLE_DENORMALS 0x00000001
 
+/**
+ * Yield worker threads to the system scheduler after the operation is finished.
+ *
+ * Force workers to use kernel wait (instead of active spin-wait by default) for new commands after this command is
+ * processed. This flag affects only the immediate next operation on this thread pool. To make the thread pool always
+ * use kernel wait, pass this flag to all parallelization functions.
+ */
+#define PTHREADPOOL_FLAG_YIELD_WORKERS 0x00000002
+
 #ifdef __cplusplus
 extern "C" {
 #endif
