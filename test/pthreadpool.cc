@@ -274,6 +274,29 @@ TEST(Parallelize1D, MultiThreadPoolEachItemProcessedMultipleTimes) {
 	}
 }
 
+static void IncrementSame1D(std::atomic_int* num_processed_items, size_t i) {
+	num_processed_items->fetch_add(1, std::memory_order_relaxed);
+}
+
+TEST(Parallelize1D, MultiThreadPoolHighContention) {
+	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
+
+	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+
+	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
+		GTEST_SKIP();
+	}
+
+	pthreadpool_parallelize_1d(
+		threadpool.get(),
+		reinterpret_cast<pthreadpool_task_1d_t>(IncrementSame1D),
+		static_cast<void*>(&num_processed_items),
+		kParallelize1DRange,
+		0 /* flags */);
+	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize1DRange);
+}
+
 static void WorkImbalance1D(std::atomic_int* num_processed_items, size_t i) {
 	num_processed_items->fetch_add(1, std::memory_order_relaxed);
 	if (i == 0) {
@@ -545,6 +568,31 @@ TEST(Parallelize1DTile1D, MultiThreadPoolEachItemProcessedMultipleTimes) {
 	}
 }
 
+static void IncrementSame1DTile1D(std::atomic_int* num_processed_items, size_t start_i, size_t tile_i) {
+	for (size_t i = start_i; i < start_i + tile_i; i++) {
+		num_processed_items->fetch_add(1, std::memory_order_relaxed);
+	}
+}
+
+TEST(Parallelize1DTile1D, MultiThreadPoolHighContention) {
+	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
+
+	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+
+	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
+		GTEST_SKIP();
+	}
+
+	pthreadpool_parallelize_1d_tile_1d(
+		threadpool.get(),
+		reinterpret_cast<pthreadpool_task_1d_tile_1d_t>(IncrementSame1DTile1D),
+		static_cast<void*>(&num_processed_items),
+		kParallelize1DTile1DRange, kParallelize1DTile1DTile,
+		0 /* flags */);
+	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize1DTile1DRange);
+}
+
 static void WorkImbalance1DTile1D(std::atomic_int* num_processed_items, size_t start_i, size_t tile_i) {
 	num_processed_items->fetch_add(tile_i, std::memory_order_relaxed);
 	if (start_i == 0) {
@@ -799,6 +847,29 @@ TEST(Parallelize2D, MultiThreadPoolEachItemProcessedMultipleTimes) {
 				<< "(expected: " << kIncrementIterations << ")";
 		}
 	}
+}
+
+static void IncrementSame2D(std::atomic_int* num_processed_items, size_t i, size_t j) {
+	num_processed_items->fetch_add(1, std::memory_order_relaxed);
+}
+
+TEST(Parallelize2D, MultiThreadPoolHighContention) {
+	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
+
+	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+
+	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
+		GTEST_SKIP();
+	}
+
+	pthreadpool_parallelize_2d(
+		threadpool.get(),
+		reinterpret_cast<pthreadpool_task_2d_t>(IncrementSame2D),
+		static_cast<void*>(&num_processed_items),
+		kParallelize2DRangeI, kParallelize2DRangeJ,
+		0 /* flags */);
+	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize2DRangeI * kParallelize2DRangeJ);
 }
 
 static void WorkImbalance2D(std::atomic_int* num_processed_items, size_t i, size_t j) {
@@ -1095,6 +1166,31 @@ TEST(Parallelize2DTile1D, MultiThreadPoolEachItemProcessedMultipleTimes) {
 				<< "(expected: " << kIncrementIterations << ")";
 		}
 	}
+}
+
+static void IncrementSame2DTile1D(std::atomic_int* num_processed_items, size_t i, size_t start_j, size_t tile_j) {
+	for (size_t j = start_j; j < start_j + tile_j; j++) {
+		num_processed_items->fetch_add(1, std::memory_order_relaxed);
+	}
+}
+
+TEST(Parallelize2DTile1D, MultiThreadPoolHighContention) {
+	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
+
+	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+
+	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
+		GTEST_SKIP();
+	}
+
+	pthreadpool_parallelize_2d_tile_1d(
+		threadpool.get(),
+		reinterpret_cast<pthreadpool_task_2d_tile_1d_t>(IncrementSame2DTile1D),
+		static_cast<void*>(&num_processed_items),
+		kParallelize2DTile1DRangeI, kParallelize2DTile1DRangeJ, kParallelize2DTile1DTileJ,
+		0 /* flags */);
+	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize2DTile1DRangeI * kParallelize2DTile1DRangeJ);
 }
 
 static void WorkImbalance2DTile1D(std::atomic_int* num_processed_items, size_t i, size_t start_j, size_t tile_j) {
@@ -1413,6 +1509,34 @@ TEST(Parallelize2DTile2D, MultiThreadPoolEachItemProcessedMultipleTimes) {
 				<< "(expected: " << kIncrementIterations << ")";
 		}
 	}
+}
+
+static void IncrementSame2DTile2D(std::atomic_int* num_processed_items, size_t start_i, size_t start_j, size_t tile_i, size_t tile_j) {
+	for (size_t i = start_i; i < start_i + tile_i; i++) {
+		for (size_t j = start_j; j < start_j + tile_j; j++) {
+			num_processed_items->fetch_add(1, std::memory_order_relaxed);
+		}
+	}
+}
+
+TEST(Parallelize2DTile2D, MultiThreadPoolHighContention) {
+	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
+
+	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+
+	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
+		GTEST_SKIP();
+	}
+
+	pthreadpool_parallelize_2d_tile_2d(
+		threadpool.get(),
+		reinterpret_cast<pthreadpool_task_2d_tile_2d_t>(IncrementSame2DTile2D),
+		static_cast<void*>(&num_processed_items),
+		kParallelize2DTile2DRangeI, kParallelize2DTile2DRangeJ,
+		kParallelize2DTile2DTileI, kParallelize2DTile2DTileJ,
+		0 /* flags */);
+	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize2DTile2DRangeI * kParallelize2DTile2DRangeJ);
 }
 
 static void WorkImbalance2DTile2D(std::atomic_int* num_processed_items, size_t start_i, size_t start_j, size_t tile_i, size_t tile_j) {
@@ -1745,6 +1869,34 @@ TEST(Parallelize3DTile2D, MultiThreadPoolEachItemProcessedMultipleTimes) {
 			}
 		}
 	}
+}
+
+static void IncrementSame3DTile2D(std::atomic_int* num_processed_items, size_t i, size_t start_j, size_t start_k, size_t tile_j, size_t tile_k) {
+	for (size_t j = start_j; j < start_j + tile_j; j++) {
+		for (size_t k = start_k; k < start_k + tile_k; k++) {
+			num_processed_items->fetch_add(1, std::memory_order_relaxed);
+		}
+	}
+}
+
+TEST(Parallelize3DTile2D, MultiThreadPoolHighContention) {
+	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
+
+	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+
+	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
+		GTEST_SKIP();
+	}
+
+	pthreadpool_parallelize_3d_tile_2d(
+		threadpool.get(),
+		reinterpret_cast<pthreadpool_task_3d_tile_2d_t>(IncrementSame3DTile2D),
+		static_cast<void*>(&num_processed_items),
+		kParallelize3DTile2DRangeI, kParallelize3DTile2DRangeJ, kParallelize3DTile2DRangeK,
+		kParallelize3DTile2DTileJ, kParallelize3DTile2DTileK,
+		0 /* flags */);
+	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize3DTile2DRangeI * kParallelize3DTile2DRangeJ * kParallelize3DTile2DRangeK);
 }
 
 static void WorkImbalance3DTile2D(std::atomic_int* num_processed_items, size_t i, size_t start_j, size_t start_k, size_t tile_j, size_t tile_k) {
@@ -2090,6 +2242,34 @@ TEST(Parallelize4DTile2D, MultiThreadPoolEachItemProcessedMultipleTimes) {
 			}
 		}
 	}
+}
+
+static void IncrementSame4DTile2D(std::atomic_int* num_processed_items, size_t i, size_t j, size_t start_k, size_t start_l, size_t tile_k, size_t tile_l) {
+	for (size_t k = start_k; k < start_k + tile_k; k++) {
+		for (size_t l = start_l; l < start_l + tile_l; l++) {
+			num_processed_items->fetch_add(1, std::memory_order_relaxed);
+		}
+	}
+}
+
+TEST(Parallelize4DTile2D, MultiThreadPoolHighContention) {
+	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
+
+	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+
+	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
+		GTEST_SKIP();
+	}
+
+	pthreadpool_parallelize_4d_tile_2d(
+		threadpool.get(),
+		reinterpret_cast<pthreadpool_task_4d_tile_2d_t>(IncrementSame4DTile2D),
+		static_cast<void*>(&num_processed_items),
+		kParallelize4DTile2DRangeI, kParallelize4DTile2DRangeJ, kParallelize4DTile2DRangeK, kParallelize4DTile2DRangeL,
+		kParallelize4DTile2DTileK, kParallelize4DTile2DTileL,
+		0 /* flags */);
+	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize4DTile2DRangeI * kParallelize4DTile2DRangeJ * kParallelize4DTile2DRangeK * kParallelize4DTile2DRangeL);
 }
 
 static void WorkImbalance4DTile2D(std::atomic_int* num_processed_items, size_t i, size_t j, size_t start_k, size_t start_l, size_t tile_k, size_t tile_l) {
@@ -2448,6 +2628,34 @@ TEST(Parallelize5DTile2D, MultiThreadPoolEachItemProcessedMultipleTimes) {
 			}
 		}
 	}
+}
+
+static void IncrementSame5DTile2D(std::atomic_int* num_processed_items, size_t i, size_t j, size_t k, size_t start_l, size_t start_m, size_t tile_l, size_t tile_m) {
+	for (size_t l = start_l; l < start_l + tile_l; l++) {
+		for (size_t m = start_m; m < start_m + tile_m; m++) {
+			num_processed_items->fetch_add(1, std::memory_order_relaxed);
+		}
+	}
+}
+
+TEST(Parallelize5DTile2D, MultiThreadPoolHighContention) {
+	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
+
+	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+
+	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
+		GTEST_SKIP();
+	}
+
+	pthreadpool_parallelize_5d_tile_2d(
+		threadpool.get(),
+		reinterpret_cast<pthreadpool_task_5d_tile_2d_t>(IncrementSame5DTile2D),
+		static_cast<void*>(&num_processed_items),
+		kParallelize5DTile2DRangeI, kParallelize5DTile2DRangeJ, kParallelize5DTile2DRangeK, kParallelize5DTile2DRangeL, kParallelize5DTile2DRangeM,
+		kParallelize5DTile2DTileL, kParallelize5DTile2DTileM,
+		0 /* flags */);
+	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize5DTile2DRangeI * kParallelize5DTile2DRangeJ * kParallelize5DTile2DRangeK * kParallelize5DTile2DRangeL * kParallelize5DTile2DRangeM);
 }
 
 static void WorkImbalance5DTile2D(std::atomic_int* num_processed_items, size_t i, size_t j, size_t k, size_t start_l, size_t start_m, size_t tile_l, size_t tile_m) {
@@ -2819,6 +3027,34 @@ TEST(Parallelize6DTile2D, MultiThreadPoolEachItemProcessedMultipleTimes) {
 			}
 		}
 	}
+}
+
+static void IncrementSame6DTile2D(std::atomic_int* num_processed_items, size_t i, size_t j, size_t k, size_t l, size_t start_m, size_t start_n, size_t tile_m, size_t tile_n) {
+	for (size_t m = start_m; m < start_m + tile_m; m++) {
+		for (size_t n = start_n; n < start_n + tile_n; n++) {
+			num_processed_items->fetch_add(1, std::memory_order_relaxed);
+		}
+	}
+}
+
+TEST(Parallelize6DTile2D, MultiThreadPoolHighContention) {
+	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
+
+	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+
+	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
+		GTEST_SKIP();
+	}
+
+	pthreadpool_parallelize_6d_tile_2d(
+		threadpool.get(),
+		reinterpret_cast<pthreadpool_task_6d_tile_2d_t>(IncrementSame6DTile2D),
+		static_cast<void*>(&num_processed_items),
+		kParallelize6DTile2DRangeI, kParallelize6DTile2DRangeJ, kParallelize6DTile2DRangeK, kParallelize6DTile2DRangeL, kParallelize6DTile2DRangeM, kParallelize6DTile2DRangeN,
+		kParallelize6DTile2DTileM, kParallelize6DTile2DTileN,
+		0 /* flags */);
+	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize6DTile2DRangeI * kParallelize6DTile2DRangeJ * kParallelize6DTile2DRangeK * kParallelize6DTile2DRangeL * kParallelize6DTile2DRangeM * kParallelize6DTile2DRangeN);
 }
 
 static void WorkImbalance6DTile2D(std::atomic_int* num_processed_items, size_t i, size_t j, size_t k, size_t l, size_t start_m, size_t start_n, size_t tile_m, size_t tile_n) {
