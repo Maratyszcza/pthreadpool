@@ -208,7 +208,7 @@ PTHREADPOOL_STATIC_ASSERT(sizeof(struct pthreadpool) % PTHREADPOOL_CACHELINE_SIZ
 static void checkin_worker_thread(struct pthreadpool* threadpool) {
 	#if PTHREADPOOL_USE_FUTEX
 		if (atomic_fetch_sub_explicit(&threadpool->active_threads, 1, memory_order_relaxed) == 1) {
-			atomic_store_explicit(&threadpool->has_active_threads, 0, memory_order_release);
+			atomic_store_explicit(&threadpool->has_active_threads, 0, memory_order_relaxed);
 			futex_wake_all(&threadpool->has_active_threads);
 		}
 	#else
@@ -312,6 +312,8 @@ static void thread_parallelize_1d(struct pthreadpool* threadpool, struct thread_
 			task(argument, item_id);
 		}
 	}
+
+	/* Make changes by this thread visible to other threads */
 	atomic_thread_fence(memory_order_release);
 }
 
@@ -322,7 +324,6 @@ static uint32_t wait_for_new_command(
 {
 	uint32_t command = atomic_load_explicit(&threadpool->command, memory_order_relaxed);
 	if (command != last_command) {
-		atomic_thread_fence(memory_order_acquire);
 		return command;
 	}
 
@@ -334,7 +335,6 @@ static uint32_t wait_for_new_command(
 
 			command = atomic_load_explicit(&threadpool->command, memory_order_relaxed);
 			if (command != last_command) {
-				atomic_thread_fence(memory_order_acquire);
 				return command;
 			}
 		}
@@ -357,7 +357,6 @@ static uint32_t wait_for_new_command(
 		/* Read a new command */
 		pthread_mutex_unlock(&threadpool->command_mutex);
 	#endif
-	atomic_thread_fence(memory_order_acquire);
 	return command;
 }
 
@@ -374,6 +373,8 @@ static void* thread_main(void* arg) {
 	/* Monitor new commands and act accordingly */
 	for (;;) {
 		uint32_t command = wait_for_new_command(threadpool, last_command, flags);
+		atomic_thread_fence(memory_order_acquire);
+
 		flags = atomic_load_explicit(&threadpool->flags, memory_order_relaxed);
 
 		/* Process command */
@@ -543,14 +544,6 @@ void pthreadpool_parallelize_1d(
 			range_start = range_end;
 		}
 
-		#if PTHREADPOOL_USE_FUTEX
-			/*
-			 * Make new command parameters globally visible. Having this fence before updating the command is important: it
-			 * guarantees that if a worker thread observes new command value, it also observes the updated command parameters.
-			 */
-			atomic_thread_fence(memory_order_release);
-		#endif
-
 		/*
 		 * Update the threadpool command.
 		 * Imporantly, do it after initializing command parameters (range, task, argument)
@@ -562,11 +555,16 @@ void pthreadpool_parallelize_1d(
 		const uint32_t new_command = ~(old_command | THREADPOOL_COMMAND_MASK) | threadpool_command_compute_1d;
 
 		#if PTHREADPOOL_USE_FUTEX
+			/*
+			 * Store the command with release semantics to guarantee that if a worker thread observes
+			 * the new command value, it also observes the updated command parameters.
+			 */
 			atomic_store_explicit(&threadpool->command, new_command, memory_order_release);
 
 			/* Wake up the threads */
 			futex_wake_all(&threadpool->command);
 		#else
+			/* Relaxed semantics because pthread_mutex_unlock acts as a release fence */
 			atomic_store_explicit(&threadpool->command, new_command, memory_order_relaxed);
 
 			/* Unlock the command variables before waking up the threads for better performance */
@@ -1173,7 +1171,7 @@ void pthreadpool_destroy(struct pthreadpool* threadpool) {
 			#if PTHREADPOOL_USE_FUTEX
 				atomic_store_explicit(
 					&threadpool->active_threads, threadpool->threads_count - 1 /* caller thread */, memory_order_relaxed);
-				atomic_store_explicit(&threadpool->has_active_threads, 1, memory_order_release);
+				atomic_store_explicit(&threadpool->has_active_threads, 1, memory_order_relaxed);
 
 				atomic_store_explicit(&threadpool->command, threadpool_command_shutdown, memory_order_release);
 
@@ -1185,10 +1183,10 @@ void pthreadpool_destroy(struct pthreadpool* threadpool) {
 
 				/* Locking of completion_mutex not needed: readers are sleeping on command_condvar */
 				atomic_store_explicit(
-					&threadpool->active_threads, threadpool->threads_count - 1 /* caller thread */, memory_order_release);
+					&threadpool->active_threads, threadpool->threads_count - 1 /* caller thread */, memory_order_relaxed);
 
 				/* Update the threadpool command. */
-				atomic_store_explicit(&threadpool->command, threadpool_command_shutdown, memory_order_release);
+				atomic_store_explicit(&threadpool->command, threadpool_command_shutdown, memory_order_relaxed);
 
 				/* Wake up worker threads */
 				pthread_cond_broadcast(&threadpool->command_condvar);
