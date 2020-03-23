@@ -578,19 +578,18 @@ void pthreadpool_parallelize_1d(
 		const uint32_t old_command = pthreadpool_load_relaxed_uint32_t(&threadpool->command);
 		const uint32_t new_command = ~(old_command | THREADPOOL_COMMAND_MASK) | threadpool_command_compute_1d;
 
+		/*
+		 * Store the command with release semantics to guarantee that if a worker thread observes
+		 * the new command value, it also observes the updated command parameters.
+		 *
+		 * Note: release semantics is necessary even with a conditional variable, because the workers might
+		 * be waiting in a spin-loop rather than the conditional variable.
+		 */
+		pthreadpool_store_release_uint32_t(&threadpool->command, new_command);
 		#if PTHREADPOOL_USE_FUTEX
-			/*
-			 * Store the command with release semantics to guarantee that if a worker thread observes
-			 * the new command value, it also observes the updated command parameters.
-			 */
-			pthreadpool_store_release_uint32_t(&threadpool->command, new_command);
-
 			/* Wake up the threads */
 			futex_wake_all(&threadpool->command);
 		#else
-			/* Relaxed semantics because pthread_mutex_unlock acts as a release fence */
-			pthreadpool_store_relaxed_uint32_t(&threadpool->command, new_command);
-
 			/* Unlock the command variables before waking up the threads for better performance */
 			pthread_mutex_unlock(&threadpool->command_mutex);
 
@@ -1196,6 +1195,10 @@ void pthreadpool_destroy(struct pthreadpool* threadpool) {
 				pthreadpool_store_relaxed_size_t(&threadpool->active_threads, threadpool->threads_count - 1 /* caller thread */);
 				pthreadpool_store_relaxed_uint32_t(&threadpool->has_active_threads, 1);
 
+				/*
+				 * Store the command with release semantics to guarantee that if a worker thread observes
+				 * the new command value, it also observes the updated active_threads/has_active_threads values.
+				 */
 				pthreadpool_store_release_uint32_t(&threadpool->command, threadpool_command_shutdown);
 
 				/* Wake up worker threads */
@@ -1206,8 +1209,14 @@ void pthreadpool_destroy(struct pthreadpool* threadpool) {
 
 				pthreadpool_store_relaxed_size_t(&threadpool->active_threads, threadpool->threads_count - 1 /* caller thread */);
 
-				/* Update the threadpool command. */
-				pthreadpool_store_relaxed_uint32_t(&threadpool->command, threadpool_command_shutdown);
+				/*
+				 * Store the command with release semantics to guarantee that if a worker thread observes
+				 * the new command value, it also observes the updated active_threads value.
+				 *
+				 * Note: the release fence inside pthread_mutex_unlock is insufficient,
+				 * because the workers might be waiting in a spin-loop rather than the conditional variable.
+				 */
+				pthreadpool_store_release_uint32_t(&threadpool->command, threadpool_command_shutdown);
 
 				/* Wake up worker threads */
 				pthread_cond_broadcast(&threadpool->command_condvar);
