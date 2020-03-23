@@ -12,6 +12,15 @@
 #ifndef PTHREADPOOL_USE_FUTEX
 	#if defined(__linux__)
 		#define PTHREADPOOL_USE_FUTEX 1
+	#elif defined(__EMSCRIPTEN__)
+		#define PTHREADPOOL_USE_FUTEX 1
+	#else
+		#define PTHREADPOOL_USE_FUTEX 0
+	#endif
+#endif
+
+#if PTHREADPOOL_USE_FUTEX
+	#if defined(__linux__)
 		#include <sys/syscall.h>
 		#include <linux/futex.h>
 
@@ -22,8 +31,13 @@
 		#ifndef FUTEX_PRIVATE_FLAG
 			#define FUTEX_PRIVATE_FLAG 128
 		#endif
+	#elif defined(__EMSCRIPTEN__)
+		/* math.h for INFINITY constant */
+		#include <math.h>
+
+		#include <emscripten/threading.h>
 	#else
-		#define PTHREADPOOL_USE_FUTEX 0
+		#error "Platform-specific implementation of futex_wait and futex_wake_all required"
 	#endif
 #endif
 
@@ -92,6 +106,14 @@ static inline size_t min(size_t a, size_t b) {
 
 		static int futex_wake_all(pthreadpool_atomic_uint32_t* address) {
 			return syscall(SYS_futex, address, FUTEX_WAKE | FUTEX_PRIVATE_FLAG, INT_MAX);
+		}
+	#elif defined(__EMSCRIPTEN__)
+		static int futex_wait(pthreadpool_atomic_uint32_t* address, uint32_t value) {
+			return emscripten_futex_wait((volatile void*) address, value, INFINITY);
+		}
+
+		static int futex_wake_all(pthreadpool_atomic_uint32_t* address) {
+			return emscripten_futex_wake((volatile void*) address, INT_MAX);
 		}
 	#else
 		#error "Platform-specific implementation of futex_wait and futex_wake_all required"
