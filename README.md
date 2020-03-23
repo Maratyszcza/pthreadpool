@@ -13,7 +13,7 @@ It provides similar functionality to `#pragma omp parallel for`, but with additi
 * Run on user-specified or auto-detected number of threads.
 * Work-stealing scheduling for efficient work balancing.
 * Wait-free synchronization of work items.
-* Compatible with Linux (including Android), macOS, iOS, Emscripten environments.
+* Compatible with Linux (including Android), macOS, iOS, MinGW, Emscripten environments.
 * 100% unit tests coverage.
 * Throughput and latency microbenchmarks.
 
@@ -35,17 +35,17 @@ int main() {
 
   pthreadpool_t threadpool = pthreadpool_create(0);
   assert(threadpool != NULL);
-  
+
   const size_t threads_count = pthreadpool_get_threads_count(threadpool);
   printf("Created thread pool with %zu threads\n", threads_count);
 
   struct array_addition_context context = { augend, addend, sum };
   pthreadpool_parallelize_1d(threadpool,
     (pthreadpool_task_1d_t) add_arrays,
-    (void**) &context,
+    (void*) &context,
     ARRAY_SIZE,
     PTHREADPOOL_FLAG_DISABLE_DENORMALS /* flags */);
-  
+
   pthreadpool_destroy(threadpool);
   threadpool = NULL;
 
