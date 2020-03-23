@@ -8,7 +8,6 @@
 #include <pthread.h>
 #include <unistd.h>
 
-/* Futex-specific headers */
 #ifndef PTHREADPOOL_USE_FUTEX
 	#if defined(__linux__)
 		#define PTHREADPOOL_USE_FUTEX 1
@@ -19,6 +18,7 @@
 	#endif
 #endif
 
+/* Futex-specific headers */
 #if PTHREADPOOL_USE_FUTEX
 	#if defined(__linux__)
 		#include <sys/syscall.h>
@@ -1190,9 +1190,10 @@ void pthreadpool_parallelize_6d_tile_2d(
 
 void pthreadpool_destroy(struct pthreadpool* threadpool) {
 	if (threadpool != NULL) {
-		if (threadpool->threads_count > 1) {
+		const size_t threads_count = threadpool->threads_count;
+		if (threads_count > 1) {
 			#if PTHREADPOOL_USE_FUTEX
-				pthreadpool_store_relaxed_size_t(&threadpool->active_threads, threadpool->threads_count - 1 /* caller thread */);
+				pthreadpool_store_relaxed_size_t(&threadpool->active_threads, threads_count - 1 /* caller thread */);
 				pthreadpool_store_relaxed_uint32_t(&threadpool->has_active_threads, 1);
 
 				/*
@@ -1207,7 +1208,7 @@ void pthreadpool_destroy(struct pthreadpool* threadpool) {
 				/* Lock the command variable to ensure that threads don't shutdown until both command and active_threads are updated */
 				pthread_mutex_lock(&threadpool->command_mutex);
 
-				pthreadpool_store_relaxed_size_t(&threadpool->active_threads, threadpool->threads_count - 1 /* caller thread */);
+				pthreadpool_store_relaxed_size_t(&threadpool->active_threads, threads_count - 1 /* caller thread */);
 
 				/*
 				 * Store the command with release semantics to guarantee that if a worker thread observes
@@ -1226,7 +1227,7 @@ void pthreadpool_destroy(struct pthreadpool* threadpool) {
 			#endif
 
 			/* Wait until all threads return */
-			for (size_t thread = 1; thread < threadpool->threads_count; thread++) {
+			for (size_t thread = 1; thread < threads_count; thread++) {
 				pthread_join(threadpool->threads[thread].thread_object, NULL);
 			}
 
