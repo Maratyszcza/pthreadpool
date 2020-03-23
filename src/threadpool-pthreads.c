@@ -523,20 +523,24 @@ void pthreadpool_parallelize_1d(
 		atomic_store_explicit(&threadpool->flags, flags, memory_order_relaxed);
 
 		/* Locking of completion_mutex not needed: readers are sleeping on command_condvar */
+		const size_t threads_count = threadpool->threads_count;
 		atomic_store_explicit(
-			&threadpool->active_threads, threadpool->threads_count - 1 /* caller thread */, memory_order_relaxed);
+			&threadpool->active_threads, threads_count - 1 /* caller thread */, memory_order_relaxed);
 		#if PTHREADPOOL_USE_FUTEX
 			atomic_store_explicit(&threadpool->has_active_threads, 1, memory_order_relaxed);
 		#endif
 
 		/* Spread the work between threads */
-		for (size_t tid = 0; tid < threadpool->threads_count; tid++) {
+		size_t range_start = 0;
+		for (size_t tid = 0; tid < threads_count; tid++) {
 			struct thread_info* thread = &threadpool->threads[tid];
-			const size_t range_start = multiply_divide(range, tid, threadpool->threads_count);
-			const size_t range_end = multiply_divide(range, tid + 1, threadpool->threads_count);
+			const size_t range_end = multiply_divide(range, tid + 1, threads_count);
 			atomic_store_explicit(&thread->range_start, range_start, memory_order_relaxed);
 			atomic_store_explicit(&thread->range_end, range_end, memory_order_relaxed);
 			atomic_store_explicit(&thread->range_length, range_end - range_start, memory_order_relaxed);
+
+			/* The next range starts where the previous ended */
+			range_start = range_end;
 		}
 
 		#if PTHREADPOOL_USE_FUTEX
