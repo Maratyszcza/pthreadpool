@@ -98,7 +98,7 @@ size_t pthreadpool_get_threads_count(pthreadpool_t threadpool);
 void pthreadpool_parallelize_1d(
 	pthreadpool_t threadpool,
 	pthreadpool_task_1d_t function,
-	void* argument,
+	void* context,
 	size_t range,
 	uint32_t flags);
 
@@ -129,7 +129,7 @@ void pthreadpool_parallelize_1d(
 void pthreadpool_parallelize_1d_tile_1d(
 	pthreadpool_t threadpool,
 	pthreadpool_task_1d_tile_1d_t function,
-	void* argument,
+	void* context,
 	size_t range,
 	size_t tile,
 	uint32_t flags);
@@ -163,7 +163,7 @@ void pthreadpool_parallelize_1d_tile_1d(
 void pthreadpool_parallelize_2d(
 	pthreadpool_t threadpool,
 	pthreadpool_task_2d_t function,
-	void* argument,
+	void* context,
 	size_t range_i,
 	size_t range_j,
 	uint32_t flags);
@@ -200,7 +200,7 @@ void pthreadpool_parallelize_2d(
 void pthreadpool_parallelize_2d_tile_1d(
 	pthreadpool_t threadpool,
 	pthreadpool_task_2d_tile_1d_t function,
-	void* argument,
+	void* context,
 	size_t range_i,
 	size_t range_j,
 	size_t tile_j,
@@ -241,7 +241,7 @@ void pthreadpool_parallelize_2d_tile_1d(
 void pthreadpool_parallelize_2d_tile_2d(
 	pthreadpool_t threadpool,
 	pthreadpool_task_2d_tile_2d_t function,
-	void* argument,
+	void* context,
 	size_t range_i,
 	size_t range_j,
 	size_t tile_i,
@@ -286,7 +286,7 @@ void pthreadpool_parallelize_2d_tile_2d(
 void pthreadpool_parallelize_3d_tile_2d(
 	pthreadpool_t threadpool,
 	pthreadpool_task_3d_tile_2d_t function,
-	void* argument,
+	void* context,
 	size_t range_i,
 	size_t range_j,
 	size_t range_k,
@@ -335,7 +335,7 @@ void pthreadpool_parallelize_3d_tile_2d(
 void pthreadpool_parallelize_4d_tile_2d(
 	pthreadpool_t threadpool,
 	pthreadpool_task_4d_tile_2d_t function,
-	void* argument,
+	void* context,
 	size_t range_i,
 	size_t range_j,
 	size_t range_k,
@@ -388,7 +388,7 @@ void pthreadpool_parallelize_4d_tile_2d(
 void pthreadpool_parallelize_5d_tile_2d(
 	pthreadpool_t threadpool,
 	pthreadpool_task_5d_tile_2d_t function,
-	void* argument,
+	void* context,
 	size_t range_i,
 	size_t range_j,
 	size_t range_k,
@@ -445,7 +445,7 @@ void pthreadpool_parallelize_5d_tile_2d(
 void pthreadpool_parallelize_6d_tile_2d(
 	pthreadpool_t threadpool,
 	pthreadpool_task_6d_tile_2d_t function,
-	void* argument,
+	void* context,
 	size_t range_i,
 	size_t range_j,
 	size_t range_k,
