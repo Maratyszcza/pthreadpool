@@ -163,11 +163,6 @@ struct PTHREADPOOL_CACHELINE_ALIGNED thread_info {
 	 * The pthread object corresponding to the thread.
 	 */
 	pthread_t thread_object;
-	/**
-	 * Condition variable used to wake up the thread.
-	 * When the thread is idle, it waits on this condition variable.
-	 */
-	pthread_cond_t wakeup_condvar;
 };
 
 PTHREADPOOL_STATIC_ASSERT(sizeof(struct thread_info) % PTHREADPOOL_CACHELINE_SIZE == 0, "thread_info structure must occupy an integer number of cache lines (64 bytes)");
