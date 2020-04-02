@@ -14,6 +14,23 @@
 	#endif
 #endif
 
+#ifndef PTHREADPOOL_USE_GCD
+	#if defined(__APPLE__)
+		#define PTHREADPOOL_USE_GCD 1
+	#else
+		#define PTHREADPOOL_USE_GCD 0
+	#endif
+#endif
+
+#ifndef PTHREADPOOL_USE_CONDVAR
+	#if PTHREADPOOL_USE_GCD || PTHREADPOOL_USE_FUTEX
+		#define PTHREADPOOL_USE_CONDVAR 0
+	#else
+		#define PTHREADPOOL_USE_CONDVAR 1
+	#endif
+#endif
+
+
 /* Number of iterations in spin-wait loop before going into futex/condvar wait */
 #define PTHREADPOOL_SPIN_WAIT_ITERATIONS 1000000
 

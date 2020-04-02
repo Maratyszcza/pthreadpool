@@ -4,15 +4,22 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* POSIX headers */
-#include <pthread.h>
-
-/* Library header */
-#include <pthreadpool.h>
-
 /* Internal headers */
 #include "threadpool-common.h"
 #include "threadpool-atomics.h"
+
+/* POSIX headers */
+#if PTHREADPOOL_USE_CONDVAR || PTHREADPOOL_USE_FUTEX
+#include <pthread.h>
+#endif
+
+/* Mach headers */
+#if PTHREADPOOL_USE_GCD
+#include <dispatch/dispatch.h>
+#endif
+
+/* Library header */
+#include <pthreadpool.h>
 
 
 #define THREADPOOL_COMMAND_MASK UINT32_C(0x7FFFFFFF)
@@ -49,10 +56,12 @@ struct PTHREADPOOL_CACHELINE_ALIGNED thread_info {
 	 * Thread pool which owns the thread.
 	 */
 	struct pthreadpool* threadpool;
+#if PTHREADPOOL_USE_CONDVAR || PTHREADPOOL_USE_FUTEX
 	/**
 	 * The pthread object corresponding to the thread.
 	 */
 	pthread_t thread_object;
+#endif
 };
 
 PTHREADPOOL_STATIC_ASSERT(sizeof(struct thread_info) % PTHREADPOOL_CACHELINE_SIZE == 0,
@@ -70,10 +79,12 @@ struct pthreadpool_1d_with_uarch_params {
 };
 
 struct PTHREADPOOL_CACHELINE_ALIGNED pthreadpool {
+#if !PTHREADPOOL_USE_GCD
 	/**
 	 * The number of threads that are processing an operation.
 	 */
 	pthreadpool_atomic_size_t active_threads;
+#endif
 #if PTHREADPOOL_USE_FUTEX
 	/**
 	 * Indicates if there are active threads.
@@ -110,11 +121,19 @@ struct PTHREADPOOL_CACHELINE_ALIGNED pthreadpool {
 	 * Copy of the flags passed to a parallelization function.
 	 */
 	pthreadpool_atomic_uint32_t flags;
+#if PTHREADPOOL_USE_CONDVAR || PTHREADPOOL_USE_FUTEX
 	/**
 	 * Serializes concurrent calls to @a pthreadpool_parallelize_* from different threads.
 	 */
 	pthread_mutex_t execution_mutex;
-#if !PTHREADPOOL_USE_FUTEX
+#endif
+#if PTHREADPOOL_USE_GCD
+	/**
+	 * Serializes concurrent calls to @a pthreadpool_parallelize_* from different threads.
+	 */
+	dispatch_semaphore_t execution_semaphore;
+#endif
+#if PTHREADPOOL_USE_CONDVAR
 	/**
 	 * Guards access to the @a active_threads variable.
 	 */
