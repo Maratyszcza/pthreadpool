@@ -176,3 +176,30 @@
 		atomic_thread_fence(memory_order_release);
 	}
 #endif
+
+static inline bool pthreadpool_try_decrement_relaxed_size_t(
+	pthreadpool_atomic_size_t* value)
+{
+	#if defined(__clang__) && (defined(__arm__) || defined(__aarch64__))
+		size_t actual_value;
+		do {
+			actual_value = __builtin_arm_ldrex((const volatile size_t*) value);
+			if (actual_value == 0) {
+				__builtin_arm_clrex();
+				return false;
+			}
+		} while (__builtin_arm_strex(actual_value - 1, (volatile size_t*) value) != 0);
+		return true;
+	#else
+		size_t actual_value = pthreadpool_load_relaxed_size_t(value);
+		if (actual_value == 0) {
+			return false;
+		}
+		while (!pthreadpool_compare_exchange_weak_relaxed_size_t(value, &actual_value, actual_value - 1)) {
+			if (actual_value == 0) {
+				return false;
+			}
+		}
+		return true;
+	#endif
+}

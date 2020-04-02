@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stddef.h>
 
 #if defined(__SSE__) || defined(__x86_64__)
 #include <xmmintrin.h>
@@ -59,4 +60,35 @@ static inline void disable_fpu_denormals() {
 			"MSR fpcr, %[fpcr]\n"
 		: [fpcr] "=r" (fpcr));
 #endif
+}
+
+static inline size_t multiply_divide(size_t a, size_t b, size_t d) {
+	#if defined(__SIZEOF_SIZE_T__) && (__SIZEOF_SIZE_T__ == 4)
+		return (size_t) (((uint64_t) a) * ((uint64_t) b)) / ((uint64_t) d);
+	#elif defined(__SIZEOF_SIZE_T__) && (__SIZEOF_SIZE_T__ == 8)
+		return (size_t) (((__uint128_t) a) * ((__uint128_t) b)) / ((__uint128_t) d);
+	#else
+		#error "Platform-specific implementation of multiply_divide required"
+	#endif
+}
+
+static inline size_t modulo_decrement(uint32_t i, uint32_t n) {
+	/* Wrap modulo n, if needed */
+	if (i == 0) {
+		i = n;
+	}
+	/* Decrement input variable */
+	return i - 1;
+}
+
+static inline size_t divide_round_up(size_t dividend, size_t divisor) {
+	if (dividend % divisor == 0) {
+		return dividend / divisor;
+	} else {
+		return dividend / divisor + 1;
+	}
+}
+
+static inline size_t min(size_t a, size_t b) {
+	return a < b ? a : b;
 }
