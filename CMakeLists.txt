@@ -1,7 +1,5 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.5 FATAL_ERROR)
 
-INCLUDE(GNUInstallDirs)
-
 # ---[ Project
 PROJECT(pthreadpool C CXX)
 
@@ -20,6 +18,8 @@ ELSE()
 ENDIF()
 
 # ---[ CMake options
+INCLUDE(GNUInstallDirs)
+
 IF(PTHREADPOOL_BUILD_TESTS)
   ENABLE_TESTING()
 ENDIF()
