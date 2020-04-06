@@ -50,8 +50,8 @@ static void thread_parallelize_1d(struct pthreadpool* threadpool, struct thread_
 	{
 		struct thread_info* other_thread = &threadpool->threads[tid];
 		while (pthreadpool_try_decrement_relaxed_size_t(&other_thread->range_length)) {
-			const size_t item_id = pthreadpool_fetch_sub_relaxed_size_t(&other_thread->range_end, 1) - 1;
-			task(argument, item_id);
+			const size_t index = pthreadpool_fetch_sub_relaxed_size_t(&other_thread->range_end, 1) - 1;
+			task(argument, index);
 		}
 	}
 
@@ -90,8 +90,642 @@ static void thread_parallelize_1d_with_uarch(struct pthreadpool* threadpool, str
 	{
 		struct thread_info* other_thread = &threadpool->threads[tid];
 		while (pthreadpool_try_decrement_relaxed_size_t(&other_thread->range_length)) {
-			const size_t item_id = pthreadpool_fetch_sub_relaxed_size_t(&other_thread->range_end, 1) - 1;
-			task(argument, uarch_index, item_id);
+			const size_t index = pthreadpool_fetch_sub_relaxed_size_t(&other_thread->range_end, 1) - 1;
+			task(argument, uarch_index, index);
+		}
+	}
+
+	/* Make changes by this thread visible to other threads */
+	pthreadpool_fence_release();
+}
+
+static void thread_parallelize_1d_tile_1d(struct pthreadpool* threadpool, struct thread_info* thread) {
+	assert(threadpool != NULL);
+	assert(thread != NULL);
+
+	const pthreadpool_task_1d_tile_1d_t task = (pthreadpool_task_1d_tile_1d_t) pthreadpool_load_relaxed_void_p(&threadpool->task);
+	void *const argument = pthreadpool_load_relaxed_void_p(&threadpool->argument);
+
+	/* Process thread's own range of items */
+	const size_t range_start = pthreadpool_load_relaxed_size_t(&thread->range_start);
+	const size_t tile = threadpool->params.parallelize_1d_tile_1d.tile;
+	size_t tile_start = range_start * tile;
+
+	const size_t range = threadpool->params.parallelize_1d_tile_1d.range;
+	while (pthreadpool_try_decrement_relaxed_size_t(&thread->range_length)) {
+		task(argument, tile_start, min(range - tile_start, tile));
+		tile_start += tile;
+	}
+
+	/* There still may be other threads with work */
+	const size_t thread_number = thread->thread_number;
+	const size_t threads_count = threadpool->threads_count;
+	for (size_t tid = modulo_decrement(thread_number, threads_count);
+		tid != thread_number;
+		tid = modulo_decrement(tid, threads_count))
+	{
+		struct thread_info* other_thread = &threadpool->threads[tid];
+		while (pthreadpool_try_decrement_relaxed_size_t(&other_thread->range_length)) {
+			const size_t tile_index = pthreadpool_fetch_sub_relaxed_size_t(&other_thread->range_end, 1) - 1;
+			const size_t tile_start = tile_index * tile;
+			task(argument, tile_start, min(range - tile_start, tile));
+		}
+	}
+
+	/* Make changes by this thread visible to other threads */
+	pthreadpool_fence_release();
+}
+
+static void thread_parallelize_2d(struct pthreadpool* threadpool, struct thread_info* thread) {
+	assert(threadpool != NULL);
+	assert(thread != NULL);
+
+	const pthreadpool_task_2d_t task = (pthreadpool_task_2d_t) pthreadpool_load_relaxed_void_p(&threadpool->task);
+	void *const argument = pthreadpool_load_relaxed_void_p(&threadpool->argument);
+
+	/* Process thread's own range of items */
+	const size_t range_start = pthreadpool_load_relaxed_size_t(&thread->range_start);
+	const struct fxdiv_divisor_size_t range_j = threadpool->params.parallelize_2d.range_j;
+	const struct fxdiv_result_size_t index_i_j = fxdiv_divide_size_t(range_start, range_j);
+	size_t i = index_i_j.quotient;
+	size_t j = index_i_j.remainder;
+
+	while (pthreadpool_try_decrement_relaxed_size_t(&thread->range_length)) {
+		task(argument, i, j);
+		if (++j == range_j.value) {
+			j = 0;
+			i += 1;
+		}
+	}
+
+	/* There still may be other threads with work */
+	const size_t thread_number = thread->thread_number;
+	const size_t threads_count = threadpool->threads_count;
+	for (size_t tid = modulo_decrement(thread_number, threads_count);
+		tid != thread_number;
+		tid = modulo_decrement(tid, threads_count))
+	{
+		struct thread_info* other_thread = &threadpool->threads[tid];
+		while (pthreadpool_try_decrement_relaxed_size_t(&other_thread->range_length)) {
+			const size_t linear_index = pthreadpool_fetch_sub_relaxed_size_t(&other_thread->range_end, 1) - 1;
+			const struct fxdiv_result_size_t index_i_j = fxdiv_divide_size_t(linear_index, range_j);
+			task(argument, index_i_j.quotient, index_i_j.remainder);
+		}
+	}
+
+	/* Make changes by this thread visible to other threads */
+	pthreadpool_fence_release();
+}
+
+static void thread_parallelize_2d_tile_1d(struct pthreadpool* threadpool, struct thread_info* thread) {
+	assert(threadpool != NULL);
+	assert(thread != NULL);
+
+	const pthreadpool_task_2d_tile_1d_t task = (pthreadpool_task_2d_tile_1d_t) pthreadpool_load_relaxed_void_p(&threadpool->task);
+	void *const argument = pthreadpool_load_relaxed_void_p(&threadpool->argument);
+
+	/* Process thread's own range of items */
+	const size_t range_start = pthreadpool_load_relaxed_size_t(&thread->range_start);
+	const struct fxdiv_divisor_size_t tile_range_j = threadpool->params.parallelize_2d_tile_1d.tile_range_j;
+	const struct fxdiv_result_size_t tile_index_i_j = fxdiv_divide_size_t(range_start, tile_range_j);
+	const size_t tile_j = threadpool->params.parallelize_2d_tile_1d.tile_j;
+	size_t i = tile_index_i_j.quotient;
+	size_t start_j = tile_index_i_j.remainder * tile_j;
+
+	const size_t range_j = threadpool->params.parallelize_2d_tile_1d.range_j;
+	while (pthreadpool_try_decrement_relaxed_size_t(&thread->range_length)) {
+		task(argument, i, start_j, min(range_j - start_j, tile_j));
+		start_j += tile_j;
+		if (start_j >= range_j) {
+			start_j = 0;
+			i += 1;
+		}
+	}
+
+	/* There still may be other threads with work */
+	const size_t thread_number = thread->thread_number;
+	const size_t threads_count = threadpool->threads_count;
+	for (size_t tid = modulo_decrement(thread_number, threads_count);
+		tid != thread_number;
+		tid = modulo_decrement(tid, threads_count))
+	{
+		struct thread_info* other_thread = &threadpool->threads[tid];
+		while (pthreadpool_try_decrement_relaxed_size_t(&other_thread->range_length)) {
+			const size_t linear_index = pthreadpool_fetch_sub_relaxed_size_t(&other_thread->range_end, 1) - 1;
+			const struct fxdiv_result_size_t tile_index_i_j = fxdiv_divide_size_t(linear_index, tile_range_j);
+			const size_t start_j = tile_index_i_j.remainder * tile_j;
+			task(argument, tile_index_i_j.quotient, start_j, min(range_j - start_j, tile_j));
+		}
+	}
+
+	/* Make changes by this thread visible to other threads */
+	pthreadpool_fence_release();
+}
+
+static void thread_parallelize_2d_tile_2d(struct pthreadpool* threadpool, struct thread_info* thread) {
+	assert(threadpool != NULL);
+	assert(thread != NULL);
+
+	const pthreadpool_task_2d_tile_2d_t task = (pthreadpool_task_2d_tile_2d_t) pthreadpool_load_relaxed_void_p(&threadpool->task);
+	void *const argument = pthreadpool_load_relaxed_void_p(&threadpool->argument);
+
+	/* Process thread's own range of items */
+	const size_t range_start = pthreadpool_load_relaxed_size_t(&thread->range_start);
+	const struct fxdiv_divisor_size_t tile_range_j = threadpool->params.parallelize_2d_tile_2d.tile_range_j;
+	const struct fxdiv_result_size_t tile_index_i_j = fxdiv_divide_size_t(range_start, tile_range_j);
+	const size_t tile_i = threadpool->params.parallelize_2d_tile_2d.tile_i;
+	const size_t tile_j = threadpool->params.parallelize_2d_tile_2d.tile_j;
+	size_t start_i = tile_index_i_j.quotient * tile_i;
+	size_t start_j = tile_index_i_j.remainder * tile_j;
+
+	const size_t range_i = threadpool->params.parallelize_2d_tile_2d.range_i;
+	const size_t range_j = threadpool->params.parallelize_2d_tile_2d.range_j;
+	while (pthreadpool_try_decrement_relaxed_size_t(&thread->range_length)) {
+		task(argument, start_i, start_j, min(range_i - start_i, tile_i), min(range_j - start_j, tile_j));
+		start_j += tile_j;
+		if (start_j >= range_j) {
+			start_j = 0;
+			start_i += tile_i;
+		}
+	}
+
+	/* There still may be other threads with work */
+	const size_t thread_number = thread->thread_number;
+	const size_t threads_count = threadpool->threads_count;
+	for (size_t tid = modulo_decrement(thread_number, threads_count);
+		tid != thread_number;
+		tid = modulo_decrement(tid, threads_count))
+	{
+		struct thread_info* other_thread = &threadpool->threads[tid];
+		while (pthreadpool_try_decrement_relaxed_size_t(&other_thread->range_length)) {
+			const size_t linear_index = pthreadpool_fetch_sub_relaxed_size_t(&other_thread->range_end, 1) - 1;
+			const struct fxdiv_result_size_t tile_index_i_j = fxdiv_divide_size_t(linear_index, tile_range_j);
+			const size_t start_i = tile_index_i_j.quotient * tile_i;
+			const size_t start_j = tile_index_i_j.remainder * tile_j;
+			task(argument, start_i, start_j, min(range_i - start_i, tile_i), min(range_j - start_j, tile_j));
+		}
+	}
+
+	/* Make changes by this thread visible to other threads */
+	pthreadpool_fence_release();
+}
+
+static void thread_parallelize_2d_tile_2d_with_uarch(struct pthreadpool* threadpool, struct thread_info* thread) {
+	assert(threadpool != NULL);
+	assert(thread != NULL);
+
+	const pthreadpool_task_2d_tile_2d_with_id_t task = (pthreadpool_task_2d_tile_2d_with_id_t) pthreadpool_load_relaxed_void_p(&threadpool->task);
+	void *const argument = pthreadpool_load_relaxed_void_p(&threadpool->argument);
+
+	const uint32_t default_uarch_index = threadpool->params.parallelize_2d_tile_2d_with_uarch.default_uarch_index;
+	uint32_t uarch_index = default_uarch_index;
+	#if PTHREADPOOL_USE_CPUINFO
+		uarch_index = cpuinfo_get_current_uarch_index();
+		if (uarch_index > threadpool->params.parallelize_2d_tile_2d_with_uarch.max_uarch_index) {
+			uarch_index = default_uarch_index;
+		}
+	#endif
+
+	/* Process thread's own range of items */
+	const struct fxdiv_divisor_size_t tile_range_j = threadpool->params.parallelize_2d_tile_2d_with_uarch.tile_range_j;
+	const size_t range_start = pthreadpool_load_relaxed_size_t(&thread->range_start);
+	const struct fxdiv_result_size_t index = fxdiv_divide_size_t(range_start, tile_range_j);
+	const size_t range_i = threadpool->params.parallelize_2d_tile_2d_with_uarch.range_i;
+	const size_t tile_i = threadpool->params.parallelize_2d_tile_2d_with_uarch.tile_i;
+	const size_t range_j = threadpool->params.parallelize_2d_tile_2d_with_uarch.range_j;
+	const size_t tile_j = threadpool->params.parallelize_2d_tile_2d_with_uarch.tile_j;
+	size_t start_i = index.quotient * tile_i;
+	size_t start_j = index.remainder * tile_j;
+
+	while (pthreadpool_try_decrement_relaxed_size_t(&thread->range_length)) {
+		task(argument, uarch_index, start_i, start_j, min(range_i - start_i, tile_i), min(range_j - start_j, tile_j));
+		start_j += tile_j;
+		if (start_j >= range_j) {
+			start_j = 0;
+			start_i += tile_i;
+		}
+	}
+
+	/* There still may be other threads with work */
+	const size_t thread_number = thread->thread_number;
+	const size_t threads_count = threadpool->threads_count;
+	for (size_t tid = modulo_decrement(thread_number, threads_count);
+		tid != thread_number;
+		tid = modulo_decrement(tid, threads_count))
+	{
+		struct thread_info* other_thread = &threadpool->threads[tid];
+		while (pthreadpool_try_decrement_relaxed_size_t(&other_thread->range_length)) {
+			const size_t linear_index = pthreadpool_fetch_sub_relaxed_size_t(&other_thread->range_end, 1) - 1;
+			const struct fxdiv_result_size_t tile_index_i_j = fxdiv_divide_size_t(linear_index, tile_range_j);
+			const size_t start_i = tile_index_i_j.quotient * tile_i;
+			const size_t start_j = tile_index_i_j.remainder * tile_j;
+			task(argument, uarch_index, start_i, start_j, min(range_i - start_i, tile_i), min(range_j - start_j, tile_j));
+		}
+	}
+
+	/* Make changes by this thread visible to other threads */
+	pthreadpool_fence_release();
+}
+
+static void thread_parallelize_3d_tile_2d(struct pthreadpool* threadpool, struct thread_info* thread) {
+	assert(threadpool != NULL);
+	assert(thread != NULL);
+
+	const pthreadpool_task_3d_tile_2d_t task = (pthreadpool_task_3d_tile_2d_t) pthreadpool_load_relaxed_void_p(&threadpool->task);
+	void *const argument = pthreadpool_load_relaxed_void_p(&threadpool->argument);
+
+	/* Process thread's own range of items */
+	const size_t range_start = pthreadpool_load_relaxed_size_t(&thread->range_start);
+	const struct fxdiv_divisor_size_t tile_range_k = threadpool->params.parallelize_3d_tile_2d.tile_range_k;
+	const struct fxdiv_result_size_t tile_index_ij_k = fxdiv_divide_size_t(range_start, tile_range_k);
+	const struct fxdiv_divisor_size_t tile_range_j = threadpool->params.parallelize_3d_tile_2d.tile_range_j;
+	const struct fxdiv_result_size_t tile_index_i_j = fxdiv_divide_size_t(tile_index_ij_k.quotient, tile_range_j);
+	const size_t tile_j = threadpool->params.parallelize_3d_tile_2d.tile_j;
+	const size_t tile_k = threadpool->params.parallelize_3d_tile_2d.tile_k;
+	size_t i = tile_index_i_j.quotient;
+	size_t start_j = tile_index_i_j.remainder * tile_j;
+	size_t start_k = tile_index_ij_k.remainder * tile_k;
+
+	const size_t range_k = threadpool->params.parallelize_3d_tile_2d.range_k;
+	const size_t range_j = threadpool->params.parallelize_3d_tile_2d.range_j;
+	while (pthreadpool_try_decrement_relaxed_size_t(&thread->range_length)) {
+		task(argument, i, start_j, start_k, min(range_j - start_j, tile_j), min(range_k - start_k, tile_k));
+		start_k += tile_k;
+		if (start_k >= range_k) {
+			start_k = 0;
+			start_j += tile_j;
+			if (start_j >= range_j) {
+				start_j = 0;
+				i += 1;
+			}
+		}
+	}
+
+	/* There still may be other threads with work */
+	const size_t thread_number = thread->thread_number;
+	const size_t threads_count = threadpool->threads_count;
+	for (size_t tid = modulo_decrement(thread_number, threads_count);
+		tid != thread_number;
+		tid = modulo_decrement(tid, threads_count))
+	{
+		struct thread_info* other_thread = &threadpool->threads[tid];
+		while (pthreadpool_try_decrement_relaxed_size_t(&other_thread->range_length)) {
+			const size_t linear_index = pthreadpool_fetch_sub_relaxed_size_t(&other_thread->range_end, 1) - 1;
+			const struct fxdiv_result_size_t tile_index_ij_k = fxdiv_divide_size_t(linear_index, tile_range_k);
+			const struct fxdiv_result_size_t tile_index_i_j = fxdiv_divide_size_t(tile_index_ij_k.quotient, tile_range_j);
+			const size_t start_j = tile_index_i_j.remainder * tile_j;
+			const size_t start_k = tile_index_ij_k.remainder * tile_k;
+			task(argument, tile_index_i_j.quotient, start_j, start_k, min(range_j - start_j, tile_j), min(range_k - start_k, tile_k));
+		}
+	}
+
+	/* Make changes by this thread visible to other threads */
+	pthreadpool_fence_release();
+}
+
+static void thread_parallelize_3d_tile_2d_with_uarch(struct pthreadpool* threadpool, struct thread_info* thread) {
+	assert(threadpool != NULL);
+	assert(thread != NULL);
+
+	const pthreadpool_task_3d_tile_2d_with_id_t task = (pthreadpool_task_3d_tile_2d_with_id_t) pthreadpool_load_relaxed_void_p(&threadpool->task);
+	void *const argument = pthreadpool_load_relaxed_void_p(&threadpool->argument);
+
+	const uint32_t default_uarch_index = threadpool->params.parallelize_3d_tile_2d_with_uarch.default_uarch_index;
+	uint32_t uarch_index = default_uarch_index;
+	#if PTHREADPOOL_USE_CPUINFO
+		uarch_index = cpuinfo_get_current_uarch_index();
+		if (uarch_index > threadpool->params.parallelize_3d_tile_2d_with_uarch.max_uarch_index) {
+			uarch_index = default_uarch_index;
+		}
+	#endif
+
+	/* Process thread's own range of items */
+	const size_t range_start = pthreadpool_load_relaxed_size_t(&thread->range_start);
+	const struct fxdiv_divisor_size_t tile_range_k = threadpool->params.parallelize_3d_tile_2d_with_uarch.tile_range_k;
+	const struct fxdiv_result_size_t tile_index_ij_k = fxdiv_divide_size_t(range_start, tile_range_k);
+	const struct fxdiv_divisor_size_t tile_range_j = threadpool->params.parallelize_3d_tile_2d_with_uarch.tile_range_j;
+	const struct fxdiv_result_size_t tile_index_i_j = fxdiv_divide_size_t(tile_index_ij_k.quotient, tile_range_j);
+	const size_t tile_j = threadpool->params.parallelize_3d_tile_2d_with_uarch.tile_j;
+	const size_t tile_k = threadpool->params.parallelize_3d_tile_2d_with_uarch.tile_k;
+	size_t i = tile_index_i_j.quotient;
+	size_t start_j = tile_index_i_j.remainder * tile_j;
+	size_t start_k = tile_index_ij_k.remainder * tile_k;
+
+	const size_t range_k = threadpool->params.parallelize_3d_tile_2d_with_uarch.range_k;
+	const size_t range_j = threadpool->params.parallelize_3d_tile_2d_with_uarch.range_j;
+	while (pthreadpool_try_decrement_relaxed_size_t(&thread->range_length)) {
+		task(argument, uarch_index, i, start_j, start_k, min(range_j - start_j, tile_j), min(range_k - start_k, tile_k));
+		start_k += tile_k;
+		if (start_k >= range_k) {
+			start_k = 0;
+			start_j += tile_j;
+			if (start_j >= range_j) {
+				start_j = 0;
+				i += 1;
+			}
+		}
+	}
+
+	/* There still may be other threads with work */
+	const size_t thread_number = thread->thread_number;
+	const size_t threads_count = threadpool->threads_count;
+	for (size_t tid = modulo_decrement(thread_number, threads_count);
+		tid != thread_number;
+		tid = modulo_decrement(tid, threads_count))
+	{
+		struct thread_info* other_thread = &threadpool->threads[tid];
+		while (pthreadpool_try_decrement_relaxed_size_t(&other_thread->range_length)) {
+			const size_t linear_index = pthreadpool_fetch_sub_relaxed_size_t(&other_thread->range_end, 1) - 1;
+			const struct fxdiv_result_size_t tile_index_ij_k = fxdiv_divide_size_t(linear_index, tile_range_k);
+			const struct fxdiv_result_size_t tile_index_i_j = fxdiv_divide_size_t(tile_index_ij_k.quotient, tile_range_j);
+			const size_t start_j = tile_index_i_j.remainder * tile_j;
+			const size_t start_k = tile_index_ij_k.remainder * tile_k;
+			task(argument, uarch_index, tile_index_i_j.quotient, start_j, start_k, min(range_j - start_j, tile_j), min(range_k - start_k, tile_k));
+		}
+	}
+
+	/* Make changes by this thread visible to other threads */
+	pthreadpool_fence_release();
+}
+
+static void thread_parallelize_4d_tile_2d(struct pthreadpool* threadpool, struct thread_info* thread) {
+	assert(threadpool != NULL);
+	assert(thread != NULL);
+
+	const pthreadpool_task_4d_tile_2d_t task = (pthreadpool_task_4d_tile_2d_t) pthreadpool_load_relaxed_void_p(&threadpool->task);
+	void *const argument = pthreadpool_load_relaxed_void_p(&threadpool->argument);
+
+	/* Process thread's own range of items */
+	const size_t range_start = pthreadpool_load_relaxed_size_t(&thread->range_start);
+	const struct fxdiv_divisor_size_t tile_range_kl = threadpool->params.parallelize_4d_tile_2d.tile_range_kl;
+	const struct fxdiv_result_size_t tile_index_ij_kl = fxdiv_divide_size_t(range_start, tile_range_kl);
+	const struct fxdiv_divisor_size_t range_j = threadpool->params.parallelize_4d_tile_2d.range_j;
+	const struct fxdiv_result_size_t index_i_j = fxdiv_divide_size_t(tile_index_ij_kl.quotient, range_j);
+	const struct fxdiv_divisor_size_t tile_range_l = threadpool->params.parallelize_4d_tile_2d.tile_range_l;
+	const struct fxdiv_result_size_t tile_index_k_l = fxdiv_divide_size_t(tile_index_ij_kl.remainder, tile_range_l);
+	const size_t tile_k = threadpool->params.parallelize_4d_tile_2d.tile_k;
+	const size_t tile_l = threadpool->params.parallelize_4d_tile_2d.tile_l;
+	size_t i = index_i_j.quotient;
+	size_t j = index_i_j.remainder;
+	size_t start_k = tile_index_k_l.quotient * tile_k;
+	size_t start_l = tile_index_k_l.remainder * tile_l;
+
+	const size_t range_l = threadpool->params.parallelize_4d_tile_2d.range_l;
+	const size_t range_k = threadpool->params.parallelize_4d_tile_2d.range_k;
+	while (pthreadpool_try_decrement_relaxed_size_t(&thread->range_length)) {
+		task(argument, i, j, start_k, start_l, min(range_k - start_k, tile_k), min(range_l - start_l, tile_l));
+		start_l += tile_l;
+		if (start_l >= range_l) {
+			start_l = 0;
+			start_k += tile_k;
+			if (start_k >= range_k) {
+				start_k = 0;
+				if (++j == range_j.value) {
+					j = 0;
+					i += 1;
+				}
+			}
+		}
+	}
+
+	/* There still may be other threads with work */
+	const size_t thread_number = thread->thread_number;
+	const size_t threads_count = threadpool->threads_count;
+	for (size_t tid = modulo_decrement(thread_number, threads_count);
+		tid != thread_number;
+		tid = modulo_decrement(tid, threads_count))
+	{
+		struct thread_info* other_thread = &threadpool->threads[tid];
+		while (pthreadpool_try_decrement_relaxed_size_t(&other_thread->range_length)) {
+			const size_t linear_index = pthreadpool_fetch_sub_relaxed_size_t(&other_thread->range_end, 1) - 1;
+			const struct fxdiv_result_size_t tile_index_ij_kl = fxdiv_divide_size_t(linear_index, tile_range_kl);
+			const struct fxdiv_result_size_t index_i_j = fxdiv_divide_size_t(tile_index_ij_kl.quotient, range_j);
+			const struct fxdiv_result_size_t tile_index_k_l = fxdiv_divide_size_t(tile_index_ij_kl.remainder, tile_range_l);
+			const size_t start_k = tile_index_k_l.quotient * tile_k;
+			const size_t start_l = tile_index_k_l.remainder * tile_l;
+			task(argument, index_i_j.quotient, index_i_j.remainder, start_k, start_l, min(range_k - start_k, tile_k), min(range_l - start_l, tile_l));
+		}
+	}
+
+	/* Make changes by this thread visible to other threads */
+	pthreadpool_fence_release();
+}
+
+static void thread_parallelize_4d_tile_2d_with_uarch(struct pthreadpool* threadpool, struct thread_info* thread) {
+	assert(threadpool != NULL);
+	assert(thread != NULL);
+
+	const pthreadpool_task_4d_tile_2d_with_id_t task = (pthreadpool_task_4d_tile_2d_with_id_t) pthreadpool_load_relaxed_void_p(&threadpool->task);
+	void *const argument = pthreadpool_load_relaxed_void_p(&threadpool->argument);
+
+	const uint32_t default_uarch_index = threadpool->params.parallelize_4d_tile_2d_with_uarch.default_uarch_index;
+	uint32_t uarch_index = default_uarch_index;
+	#if PTHREADPOOL_USE_CPUINFO
+		uarch_index = cpuinfo_get_current_uarch_index();
+		if (uarch_index > threadpool->params.parallelize_4d_tile_2d_with_uarch.max_uarch_index) {
+			uarch_index = default_uarch_index;
+		}
+	#endif
+
+	/* Process thread's own range of items */
+	const size_t range_start = pthreadpool_load_relaxed_size_t(&thread->range_start);
+	const struct fxdiv_divisor_size_t tile_range_kl = threadpool->params.parallelize_4d_tile_2d_with_uarch.tile_range_kl;
+	const struct fxdiv_result_size_t tile_index_ij_kl = fxdiv_divide_size_t(range_start, tile_range_kl);
+	const struct fxdiv_divisor_size_t range_j = threadpool->params.parallelize_4d_tile_2d_with_uarch.range_j;
+	const struct fxdiv_result_size_t index_i_j = fxdiv_divide_size_t(tile_index_ij_kl.quotient, range_j);
+	const struct fxdiv_divisor_size_t tile_range_l = threadpool->params.parallelize_4d_tile_2d_with_uarch.tile_range_l;
+	const struct fxdiv_result_size_t tile_index_k_l = fxdiv_divide_size_t(tile_index_ij_kl.remainder, tile_range_l);
+	const size_t tile_k = threadpool->params.parallelize_4d_tile_2d_with_uarch.tile_k;
+	const size_t tile_l = threadpool->params.parallelize_4d_tile_2d_with_uarch.tile_l;
+	size_t i = index_i_j.quotient;
+	size_t j = index_i_j.remainder;
+	size_t start_k = tile_index_k_l.quotient * tile_k;
+	size_t start_l = tile_index_k_l.remainder * tile_l;
+
+	const size_t range_l = threadpool->params.parallelize_4d_tile_2d_with_uarch.range_l;
+	const size_t range_k = threadpool->params.parallelize_4d_tile_2d_with_uarch.range_k;
+	while (pthreadpool_try_decrement_relaxed_size_t(&thread->range_length)) {
+		task(argument, uarch_index, i, j, start_k, start_l, min(range_k - start_k, tile_k), min(range_l - start_l, tile_l));
+		start_l += tile_l;
+		if (start_l >= range_l) {
+			start_l = 0;
+			start_k += tile_k;
+			if (start_k >= range_k) {
+				start_k = 0;
+				if (++j == range_j.value) {
+					j = 0;
+					i += 1;
+				}
+			}
+		}
+	}
+
+	/* There still may be other threads with work */
+	const size_t thread_number = thread->thread_number;
+	const size_t threads_count = threadpool->threads_count;
+	for (size_t tid = modulo_decrement(thread_number, threads_count);
+		tid != thread_number;
+		tid = modulo_decrement(tid, threads_count))
+	{
+		struct thread_info* other_thread = &threadpool->threads[tid];
+		while (pthreadpool_try_decrement_relaxed_size_t(&other_thread->range_length)) {
+			const size_t linear_index = pthreadpool_fetch_sub_relaxed_size_t(&other_thread->range_end, 1) - 1;
+			const struct fxdiv_result_size_t tile_index_ij_kl = fxdiv_divide_size_t(linear_index, tile_range_kl);
+			const struct fxdiv_result_size_t index_i_j = fxdiv_divide_size_t(tile_index_ij_kl.quotient, range_j);
+			const struct fxdiv_result_size_t tile_index_k_l = fxdiv_divide_size_t(tile_index_ij_kl.remainder, tile_range_l);
+			const size_t start_k = tile_index_k_l.quotient * tile_k;
+			const size_t start_l = tile_index_k_l.remainder * tile_l;
+			task(argument, uarch_index, index_i_j.quotient, index_i_j.remainder, start_k, start_l, min(range_k - start_k, tile_k), min(range_l - start_l, tile_l));
+		}
+	}
+
+	/* Make changes by this thread visible to other threads */
+	pthreadpool_fence_release();
+}
+
+static void thread_parallelize_5d_tile_2d(struct pthreadpool* threadpool, struct thread_info* thread) {
+	assert(threadpool != NULL);
+	assert(thread != NULL);
+
+	const pthreadpool_task_5d_tile_2d_t task = (pthreadpool_task_5d_tile_2d_t) pthreadpool_load_relaxed_void_p(&threadpool->task);
+	void *const argument = pthreadpool_load_relaxed_void_p(&threadpool->argument);
+
+	/* Process thread's own range of items */
+	const size_t range_start = pthreadpool_load_relaxed_size_t(&thread->range_start);
+	const struct fxdiv_divisor_size_t tile_range_lm = threadpool->params.parallelize_5d_tile_2d.tile_range_lm;
+	const struct fxdiv_result_size_t tile_index_ijk_lm = fxdiv_divide_size_t(range_start, tile_range_lm);
+	const struct fxdiv_divisor_size_t range_k = threadpool->params.parallelize_5d_tile_2d.range_k;
+	const struct fxdiv_result_size_t index_ij_k = fxdiv_divide_size_t(tile_index_ijk_lm.quotient, range_k);
+	const struct fxdiv_divisor_size_t tile_range_m = threadpool->params.parallelize_5d_tile_2d.tile_range_m;
+	const struct fxdiv_result_size_t tile_index_l_m = fxdiv_divide_size_t(tile_index_ijk_lm.remainder, tile_range_m);
+	const struct fxdiv_divisor_size_t range_j = threadpool->params.parallelize_5d_tile_2d.range_j;
+	const struct fxdiv_result_size_t index_i_j = fxdiv_divide_size_t(index_ij_k.quotient, range_j);
+	const size_t tile_l = threadpool->params.parallelize_5d_tile_2d.tile_l;
+	const size_t tile_m = threadpool->params.parallelize_5d_tile_2d.tile_m;
+	size_t i = index_i_j.quotient;
+	size_t j = index_i_j.remainder;
+	size_t k = index_ij_k.remainder;
+	size_t start_l = tile_index_l_m.quotient * tile_l;
+	size_t start_m = tile_index_l_m.remainder * tile_m;
+
+	const size_t range_m = threadpool->params.parallelize_5d_tile_2d.range_m;
+	const size_t range_l = threadpool->params.parallelize_5d_tile_2d.range_l;
+	while (pthreadpool_try_decrement_relaxed_size_t(&thread->range_length)) {
+		task(argument, i, j, k, start_l, start_m, min(range_l - start_l, tile_l), min(range_m - start_m, tile_m));
+		start_m += tile_m;
+		if (start_m >= range_m) {
+			start_m = 0;
+			start_l += tile_l;
+			if (start_l >= range_l) {
+				start_l = 0;
+				if (++k == range_k.value) {
+					k = 0;
+					if (++j == range_j.value) {
+						j = 0;
+						i += 1;
+					}
+				}
+			}
+		}
+	}
+
+	/* There still may be other threads with work */
+	const size_t thread_number = thread->thread_number;
+	const size_t threads_count = threadpool->threads_count;
+	for (size_t tid = modulo_decrement(thread_number, threads_count);
+		tid != thread_number;
+		tid = modulo_decrement(tid, threads_count))
+	{
+		struct thread_info* other_thread = &threadpool->threads[tid];
+		while (pthreadpool_try_decrement_relaxed_size_t(&other_thread->range_length)) {
+			const size_t linear_index = pthreadpool_fetch_sub_relaxed_size_t(&other_thread->range_end, 1) - 1;
+			const struct fxdiv_result_size_t tile_index_ijk_lm = fxdiv_divide_size_t(linear_index, tile_range_lm);
+			const struct fxdiv_result_size_t index_ij_k = fxdiv_divide_size_t(tile_index_ijk_lm.quotient, range_k);
+			const struct fxdiv_result_size_t tile_index_l_m = fxdiv_divide_size_t(tile_index_ijk_lm.remainder, tile_range_m);
+			const struct fxdiv_result_size_t index_i_j = fxdiv_divide_size_t(index_ij_k.quotient, range_j);
+			const size_t start_l = tile_index_l_m.quotient * tile_l;
+			const size_t start_m = tile_index_l_m.remainder * tile_m;
+			task(argument, index_i_j.quotient, index_i_j.remainder, index_ij_k.remainder,
+				start_l, start_m, min(range_l - start_l, tile_l), min(range_m - start_m, tile_m));
+		}
+	}
+
+	/* Make changes by this thread visible to other threads */
+	pthreadpool_fence_release();
+}
+
+static void thread_parallelize_6d_tile_2d(struct pthreadpool* threadpool, struct thread_info* thread) {
+	assert(threadpool != NULL);
+	assert(thread != NULL);
+
+	const pthreadpool_task_6d_tile_2d_t task = (pthreadpool_task_6d_tile_2d_t) pthreadpool_load_relaxed_void_p(&threadpool->task);
+	void *const argument = pthreadpool_load_relaxed_void_p(&threadpool->argument);
+
+	/* Process thread's own range of items */
+	const size_t range_start = pthreadpool_load_relaxed_size_t(&thread->range_start);
+	const struct fxdiv_divisor_size_t tile_range_mn = threadpool->params.parallelize_6d_tile_2d.tile_range_mn;
+	const struct fxdiv_result_size_t tile_index_ijkl_mn = fxdiv_divide_size_t(range_start, tile_range_mn);
+	const struct fxdiv_divisor_size_t range_kl = threadpool->params.parallelize_6d_tile_2d.range_kl;
+	const struct fxdiv_result_size_t index_ij_kl = fxdiv_divide_size_t(tile_index_ijkl_mn.quotient, range_kl);
+	const struct fxdiv_divisor_size_t tile_range_n = threadpool->params.parallelize_6d_tile_2d.tile_range_n;
+	const struct fxdiv_result_size_t tile_index_m_n = fxdiv_divide_size_t(tile_index_ijkl_mn.remainder, tile_range_n);
+	const struct fxdiv_divisor_size_t range_j = threadpool->params.parallelize_6d_tile_2d.range_j;
+	const struct fxdiv_result_size_t index_i_j = fxdiv_divide_size_t(index_ij_kl.quotient, range_j);
+	const struct fxdiv_divisor_size_t range_l = threadpool->params.parallelize_6d_tile_2d.range_l;
+	const struct fxdiv_result_size_t index_k_l = fxdiv_divide_size_t(index_ij_kl.remainder, range_l);
+	const size_t tile_m = threadpool->params.parallelize_6d_tile_2d.tile_m;
+	const size_t tile_n = threadpool->params.parallelize_6d_tile_2d.tile_n;
+	size_t i = index_i_j.quotient;
+	size_t j = index_i_j.remainder;
+	size_t k = index_k_l.quotient;
+	size_t l = index_k_l.remainder;
+	size_t start_m = tile_index_m_n.quotient * tile_m;
+	size_t start_n = tile_index_m_n.remainder * tile_n;
+
+	const size_t range_n = threadpool->params.parallelize_6d_tile_2d.range_n;
+	const size_t range_m = threadpool->params.parallelize_6d_tile_2d.range_m;
+	const size_t range_k = threadpool->params.parallelize_6d_tile_2d.range_k;
+	while (pthreadpool_try_decrement_relaxed_size_t(&thread->range_length)) {
+		task(argument, i, j, k, l, start_m, start_n, min(range_m - start_m, tile_m), min(range_n - start_n, tile_n));
+		start_n += tile_n;
+		if (start_n >= range_n) {
+			start_n = 0;
+			start_m += tile_m;
+			if (start_m >= range_m) {
+				start_m = 0;
+				if (++l == range_l.value) {
+					l = 0;
+					if (++k == range_k) {
+						k = 0;
+						if (++j == range_j.value) {
+							j = 0;
+							i += 1;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	/* There still may be other threads with work */
+	const size_t thread_number = thread->thread_number;
+	const size_t threads_count = threadpool->threads_count;
+	for (size_t tid = modulo_decrement(thread_number, threads_count);
+		tid != thread_number;
+		tid = modulo_decrement(tid, threads_count))
+	{
+		struct thread_info* other_thread = &threadpool->threads[tid];
+		while (pthreadpool_try_decrement_relaxed_size_t(&other_thread->range_length)) {
+			const size_t linear_index = pthreadpool_fetch_sub_relaxed_size_t(&other_thread->range_end, 1) - 1;
+			const struct fxdiv_result_size_t tile_index_ijkl_mn = fxdiv_divide_size_t(linear_index, tile_range_mn);
+			const struct fxdiv_result_size_t index_ij_kl = fxdiv_divide_size_t(tile_index_ijkl_mn.quotient, range_kl);
+			const struct fxdiv_result_size_t tile_index_m_n = fxdiv_divide_size_t(tile_index_ijkl_mn.remainder, tile_range_n);
+			const struct fxdiv_result_size_t index_i_j = fxdiv_divide_size_t(index_ij_kl.quotient, range_j);
+			const struct fxdiv_result_size_t index_k_l = fxdiv_divide_size_t(index_ij_kl.remainder, range_l);
+			const size_t start_m = tile_index_m_n.quotient * tile_m;
+			const size_t start_n = tile_index_m_n.remainder * tile_n;
+			task(argument, index_i_j.quotient, index_i_j.remainder, index_k_l.quotient, index_k_l.remainder,
+				start_m, start_n, min(range_m - start_m, tile_m), min(range_n - start_n, tile_n));
 		}
 	}
 
@@ -168,20 +802,6 @@ void pthreadpool_parallelize_1d_with_uarch(
 	}
 }
 
-struct compute_1d_tile_1d_context {
-	pthreadpool_task_1d_tile_1d_t task;
-	void* argument;
-	size_t range;
-	size_t tile;
-};
-
-static void compute_1d_tile_1d(const struct compute_1d_tile_1d_context* context, size_t linear_index) {
-	const size_t tile_index = linear_index;
-	const size_t index = tile_index * context->tile;
-	const size_t tile = min(context->tile, context->range - index);
-	context->task(context->argument, index, tile);
-}
-
 void pthreadpool_parallelize_1d_tile_1d(
 	pthreadpool_t threadpool,
 	pthreadpool_task_1d_tile_1d_t task,
@@ -204,34 +824,18 @@ void pthreadpool_parallelize_1d_tile_1d(
 			set_fpu_state(saved_fpu_state);
 		}
 	} else {
-		/* Execute in parallel on the thread pool using linearized index */
-		const size_t tile_range = divide_round_up(range, tile);
-		struct compute_1d_tile_1d_context context = {
-			.task = task,
-			.argument = argument,
+		const struct pthreadpool_1d_tile_1d_params params = {
 			.range = range,
-			.tile = tile
+			.tile = tile,
 		};
 		pthreadpool_parallelize(
-			threadpool, &thread_parallelize_1d, NULL, 0,
-			(void*) compute_1d_tile_1d, &context, tile_range, flags);
+			threadpool, &thread_parallelize_1d_tile_1d, &params, sizeof(params),
+			task, argument, divide_round_up(range, tile), flags);
 	}
 }
 
-struct compute_2d_context {
-	pthreadpool_task_2d_t task;
-	void* argument;
-	struct fxdiv_divisor_size_t range_j;
-};
-
-static void compute_2d(const struct compute_2d_context* context, size_t linear_index) {
-	const struct fxdiv_divisor_size_t range_j = context->range_j;
-	const struct fxdiv_result_size_t index = fxdiv_divide_size_t(linear_index, range_j);
-	context->task(context->argument, index.quotient, index.remainder);
-}
-
 void pthreadpool_parallelize_2d(
-	struct pthreadpool* threadpool,
+	pthreadpool_t threadpool,
 	pthreadpool_task_2d_t task,
 	void* argument,
 	size_t range_i,
@@ -254,35 +858,13 @@ void pthreadpool_parallelize_2d(
 			set_fpu_state(saved_fpu_state);
 		}
 	} else {
-		/* Execute in parallel on the thread pool using linearized index */
-		struct compute_2d_context context = {
-			.task = task,
-			.argument = argument,
-			.range_j = fxdiv_init_size_t(range_j)
+		const struct pthreadpool_2d_params params = {
+			.range_j = fxdiv_init_size_t(range_j),
 		};
 		pthreadpool_parallelize(
-			threadpool, &thread_parallelize_1d, NULL, 0,
-			(void*) compute_2d, &context, range_i * range_j, flags);
+			threadpool, &thread_parallelize_2d, &params, sizeof(params),
+			task, argument, range_i * range_j, flags);
 	}
-}
-
-struct compute_2d_tile_1d_context {
-	pthreadpool_task_2d_tile_1d_t task;
-	void* argument;
-	struct fxdiv_divisor_size_t tile_range_j;
-	size_t range_i;
-	size_t range_j;
-	size_t tile_j;
-};
-
-static void compute_2d_tile_1d(const struct compute_2d_tile_1d_context* context, size_t linear_index) {
-	const struct fxdiv_divisor_size_t tile_range_j = context->tile_range_j;
-	const struct fxdiv_result_size_t tile_index = fxdiv_divide_size_t(linear_index, tile_range_j);
-	const size_t max_tile_j = context->tile_j;
-	const size_t index_i = tile_index.quotient;
-	const size_t index_j = tile_index.remainder * max_tile_j;
-	const size_t tile_j = min(max_tile_j, context->range_j - index_j);
-	context->task(context->argument, index_i, index_j, tile_j);
 }
 
 void pthreadpool_parallelize_2d_tile_1d(
@@ -310,42 +892,16 @@ void pthreadpool_parallelize_2d_tile_1d(
 			set_fpu_state(saved_fpu_state);
 		}
 	} else {
-		/* Execute in parallel on the thread pool using linearized index */
 		const size_t tile_range_j = divide_round_up(range_j, tile_j);
-		struct compute_2d_tile_1d_context context = {
-			.task = task,
-			.argument = argument,
-			.tile_range_j = fxdiv_init_size_t(tile_range_j),
-			.range_i = range_i,
+		const struct pthreadpool_2d_tile_1d_params params = {
 			.range_j = range_j,
-			.tile_j = tile_j
+			.tile_j = tile_j,
+			.tile_range_j = fxdiv_init_size_t(tile_range_j),
 		};
 		pthreadpool_parallelize(
-			threadpool, &thread_parallelize_1d, NULL, 0,
-			(void*) compute_2d_tile_1d, &context, range_i * tile_range_j, flags);
+			threadpool, &thread_parallelize_2d_tile_1d, &params, sizeof(params),
+			task, argument, range_i * tile_range_j, flags);
 	}
-}
-
-struct compute_2d_tile_2d_context {
-	pthreadpool_task_2d_tile_2d_t task;
-	void* argument;
-	struct fxdiv_divisor_size_t tile_range_j;
-	size_t range_i;
-	size_t range_j;
-	size_t tile_i;
-	size_t tile_j;
-};
-
-static void compute_2d_tile_2d(const struct compute_2d_tile_2d_context* context, size_t linear_index) {
-	const struct fxdiv_divisor_size_t tile_range_j = context->tile_range_j;
-	const struct fxdiv_result_size_t tile_index = fxdiv_divide_size_t(linear_index, tile_range_j);
-	const size_t max_tile_i = context->tile_i;
-	const size_t max_tile_j = context->tile_j;
-	const size_t index_i = tile_index.quotient * max_tile_i;
-	const size_t index_j = tile_index.remainder * max_tile_j;
-	const size_t tile_i = min(max_tile_i, context->range_i - index_i);
-	const size_t tile_j = min(max_tile_j, context->range_j - index_j);
-	context->task(context->argument, index_i, index_j, tile_i, tile_j);
 }
 
 void pthreadpool_parallelize_2d_tile_2d(
@@ -374,44 +930,19 @@ void pthreadpool_parallelize_2d_tile_2d(
 			set_fpu_state(saved_fpu_state);
 		}
 	} else {
-		/* Execute in parallel on the thread pool using linearized index */
 		const size_t tile_range_i = divide_round_up(range_i, tile_i);
 		const size_t tile_range_j = divide_round_up(range_j, tile_j);
-		struct compute_2d_tile_2d_context context = {
-			.task = task,
-			.argument = argument,
-			.tile_range_j = fxdiv_init_size_t(tile_range_j),
+		const struct pthreadpool_2d_tile_2d_params params = {
 			.range_i = range_i,
-			.range_j = range_j,
 			.tile_i = tile_i,
-			.tile_j = tile_j
+			.range_j = range_j,
+			.tile_j = tile_j,
+			.tile_range_j = fxdiv_init_size_t(tile_range_j),
 		};
 		pthreadpool_parallelize(
-			threadpool, &thread_parallelize_1d, NULL, 0,
-			(void*) compute_2d_tile_2d, &context, tile_range_i * tile_range_j, flags);
+			threadpool, &thread_parallelize_2d_tile_2d, &params, sizeof(params),
+			task, argument, tile_range_i * tile_range_j, flags);
 	}
-}
-
-struct compute_2d_tile_2d_with_uarch_context {
-	pthreadpool_task_2d_tile_2d_with_id_t task;
-	void* argument;
-	struct fxdiv_divisor_size_t tile_range_j;
-	size_t range_i;
-	size_t range_j;
-	size_t tile_i;
-	size_t tile_j;
-};
-
-static void compute_2d_tile_2d_with_uarch(const struct compute_2d_tile_2d_with_uarch_context* context, uint32_t uarch_index, size_t linear_index) {
-	const struct fxdiv_divisor_size_t tile_range_j = context->tile_range_j;
-	const struct fxdiv_result_size_t tile_index = fxdiv_divide_size_t(linear_index, tile_range_j);
-	const size_t max_tile_i = context->tile_i;
-	const size_t max_tile_j = context->tile_j;
-	const size_t index_i = tile_index.quotient * max_tile_i;
-	const size_t index_j = tile_index.remainder * max_tile_j;
-	const size_t tile_i = min(max_tile_i, context->range_i - index_i);
-	const size_t tile_j = min(max_tile_j, context->range_j - index_j);
-	context->task(context->argument, uarch_index, index_i, index_j, tile_i, tile_j);
 }
 
 void pthreadpool_parallelize_2d_tile_2d_with_uarch(
@@ -451,52 +982,21 @@ void pthreadpool_parallelize_2d_tile_2d_with_uarch(
 			set_fpu_state(saved_fpu_state);
 		}
 	} else {
-		/* Execute in parallel on the thread pool using linearized index */
 		const size_t tile_range_i = divide_round_up(range_i, tile_i);
 		const size_t tile_range_j = divide_round_up(range_j, tile_j);
-		const struct pthreadpool_1d_with_uarch_params params = {
+		const struct pthreadpool_2d_tile_2d_with_uarch_params params = {
 			.default_uarch_index = default_uarch_index,
 			.max_uarch_index = max_uarch_index,
-		};
-		struct compute_2d_tile_2d_with_uarch_context context = {
-			.task = task,
-			.argument = argument,
-			.tile_range_j = fxdiv_init_size_t(tile_range_j),
 			.range_i = range_i,
-			.range_j = range_j,
 			.tile_i = tile_i,
-			.tile_j = tile_j
+			.range_j = range_j,
+			.tile_j = tile_j,
+			.tile_range_j = fxdiv_init_size_t(tile_range_j),
 		};
 		pthreadpool_parallelize(
-			threadpool, &thread_parallelize_1d_with_uarch, &params, sizeof(params),
-			(void*) compute_2d_tile_2d_with_uarch, &context, tile_range_i * tile_range_j, flags);
+			threadpool, &thread_parallelize_2d_tile_2d_with_uarch, &params, sizeof(params),
+			task, argument, tile_range_i * tile_range_j, flags);
 	}
-}
-
-struct compute_3d_tile_2d_context {
-	pthreadpool_task_3d_tile_2d_t task;
-	void* argument;
-	struct fxdiv_divisor_size_t tile_range_j;
-	struct fxdiv_divisor_size_t tile_range_k;
-	size_t range_j;
-	size_t range_k;
-	size_t tile_j;
-	size_t tile_k;
-};
-
-static void compute_3d_tile_2d(const struct compute_3d_tile_2d_context* context, size_t linear_index) {
-	const struct fxdiv_divisor_size_t tile_range_k = context->tile_range_k;
-	const struct fxdiv_result_size_t tile_index_ij_k = fxdiv_divide_size_t(linear_index, tile_range_k);
-	const struct fxdiv_divisor_size_t tile_range_j = context->tile_range_j;
-	const struct fxdiv_result_size_t tile_index_i_j = fxdiv_divide_size_t(tile_index_ij_k.quotient, tile_range_j);
-	const size_t max_tile_j = context->tile_j;
-	const size_t max_tile_k = context->tile_k;
-	const size_t index_i = tile_index_i_j.quotient;
-	const size_t index_j = tile_index_i_j.remainder * max_tile_j;
-	const size_t index_k = tile_index_ij_k.remainder * max_tile_k;
-	const size_t tile_j = min(max_tile_j, context->range_j - index_j);
-	const size_t tile_k = min(max_tile_k, context->range_k - index_k);
-	context->task(context->argument, index_i, index_j, index_k, tile_j, tile_k);
 }
 
 void pthreadpool_parallelize_3d_tile_2d(
@@ -528,49 +1028,20 @@ void pthreadpool_parallelize_3d_tile_2d(
 			set_fpu_state(saved_fpu_state);
 		}
 	} else {
-		/* Execute in parallel on the thread pool using linearized index */
 		const size_t tile_range_j = divide_round_up(range_j, tile_j);
 		const size_t tile_range_k = divide_round_up(range_k, tile_k);
-		struct compute_3d_tile_2d_context context = {
-			.task = task,
-			.argument = argument,
+		const struct pthreadpool_3d_tile_2d_params params = {
+			.range_j = range_j,
+			.tile_j = tile_j,
+			.range_k = range_k,
+			.tile_k = tile_k,
 			.tile_range_j = fxdiv_init_size_t(tile_range_j),
 			.tile_range_k = fxdiv_init_size_t(tile_range_k),
-			.range_j = range_j,
-			.range_k = range_k,
-			.tile_j = tile_j,
-			.tile_k = tile_k
 		};
 		pthreadpool_parallelize(
-			threadpool, &thread_parallelize_1d, NULL, 0,
-			(void*) compute_3d_tile_2d, &context, range_i * tile_range_j * tile_range_k, flags);
+			threadpool, &thread_parallelize_3d_tile_2d, &params, sizeof(params),
+			task, argument, range_i * tile_range_j * tile_range_k, flags);
 	}
-}
-
-struct compute_3d_tile_2d_with_uarch_context {
-	pthreadpool_task_3d_tile_2d_with_id_t task;
-	void* argument;
-	struct fxdiv_divisor_size_t tile_range_j;
-	struct fxdiv_divisor_size_t tile_range_k;
-	size_t range_j;
-	size_t range_k;
-	size_t tile_j;
-	size_t tile_k;
-};
-
-static void compute_3d_tile_2d_with_uarch(const struct compute_3d_tile_2d_with_uarch_context* context, uint32_t uarch_index, size_t linear_index) {
-	const struct fxdiv_divisor_size_t tile_range_k = context->tile_range_k;
-	const struct fxdiv_result_size_t tile_index_ij_k = fxdiv_divide_size_t(linear_index, tile_range_k);
-	const struct fxdiv_divisor_size_t tile_range_j = context->tile_range_j;
-	const struct fxdiv_result_size_t tile_index_i_j = fxdiv_divide_size_t(tile_index_ij_k.quotient, tile_range_j);
-	const size_t max_tile_j = context->tile_j;
-	const size_t max_tile_k = context->tile_k;
-	const size_t index_i = tile_index_i_j.quotient;
-	const size_t index_j = tile_index_i_j.remainder * max_tile_j;
-	const size_t index_k = tile_index_ij_k.remainder * max_tile_k;
-	const size_t tile_j = min(max_tile_j, context->range_j - index_j);
-	const size_t tile_k = min(max_tile_k, context->range_k - index_k);
-	context->task(context->argument, uarch_index, index_i, index_j, index_k, tile_j, tile_k);
 }
 
 void pthreadpool_parallelize_3d_tile_2d_with_uarch(
@@ -613,57 +1084,22 @@ void pthreadpool_parallelize_3d_tile_2d_with_uarch(
 			set_fpu_state(saved_fpu_state);
 		}
 	} else {
-		/* Execute in parallel on the thread pool using linearized index */
 		const size_t tile_range_j = divide_round_up(range_j, tile_j);
 		const size_t tile_range_k = divide_round_up(range_k, tile_k);
-		const struct pthreadpool_1d_with_uarch_params params = {
+		const struct pthreadpool_3d_tile_2d_with_uarch_params params = {
 			.default_uarch_index = default_uarch_index,
 			.max_uarch_index = max_uarch_index,
-		};
-		struct compute_3d_tile_2d_with_uarch_context context = {
-			.task = task,
-			.argument = argument,
+			.range_j = range_j,
+			.tile_j = tile_j,
+			.range_k = range_k,
+			.tile_k = tile_k,
 			.tile_range_j = fxdiv_init_size_t(tile_range_j),
 			.tile_range_k = fxdiv_init_size_t(tile_range_k),
-			.range_j = range_j,
-			.range_k = range_k,
-			.tile_j = tile_j,
-			.tile_k = tile_k
 		};
 		pthreadpool_parallelize(
-			threadpool, &thread_parallelize_1d_with_uarch, &params, sizeof(params),
-			(void*) compute_3d_tile_2d_with_uarch, &context, range_i * tile_range_j * tile_range_k, flags);
+			threadpool, &thread_parallelize_3d_tile_2d_with_uarch, &params, sizeof(params),
+			task, argument, range_i * tile_range_j * tile_range_k, flags);
 	}
-}
-
-struct compute_4d_tile_2d_context {
-	pthreadpool_task_4d_tile_2d_t task;
-	void* argument;
-	struct fxdiv_divisor_size_t tile_range_kl;
-	struct fxdiv_divisor_size_t range_j;
-	struct fxdiv_divisor_size_t tile_range_l;
-	size_t range_k;
-	size_t range_l;
-	size_t tile_k;
-	size_t tile_l;
-};
-
-static void compute_4d_tile_2d(const struct compute_4d_tile_2d_context* context, size_t linear_index) {
-	const struct fxdiv_divisor_size_t tile_range_kl = context->tile_range_kl;
-	const struct fxdiv_result_size_t tile_index_ij_kl = fxdiv_divide_size_t(linear_index, tile_range_kl);
-	const struct fxdiv_divisor_size_t range_j = context->range_j;
-	const struct fxdiv_result_size_t tile_index_i_j = fxdiv_divide_size_t(tile_index_ij_kl.quotient, range_j);
-	const struct fxdiv_divisor_size_t tile_range_l = context->tile_range_l;
-	const struct fxdiv_result_size_t tile_index_k_l = fxdiv_divide_size_t(tile_index_ij_kl.remainder, tile_range_l);
-	const size_t max_tile_k = context->tile_k;
-	const size_t max_tile_l = context->tile_l;
-	const size_t index_i = tile_index_i_j.quotient;
-	const size_t index_j = tile_index_i_j.remainder;
-	const size_t index_k = tile_index_k_l.quotient * max_tile_k;
-	const size_t index_l = tile_index_k_l.remainder * max_tile_l;
-	const size_t tile_k = min(max_tile_k, context->range_k - index_k);
-	const size_t tile_l = min(max_tile_l, context->range_l - index_l);
-	context->task(context->argument, index_i, index_j, index_k, index_l, tile_k, tile_l);
 }
 
 void pthreadpool_parallelize_4d_tile_2d(
@@ -699,54 +1135,21 @@ void pthreadpool_parallelize_4d_tile_2d(
 			set_fpu_state(saved_fpu_state);
 		}
 	} else {
-		/* Execute in parallel on the thread pool using linearized index */
-		const size_t tile_range_k = divide_round_up(range_k, tile_k);
 		const size_t tile_range_l = divide_round_up(range_l, tile_l);
-		struct compute_4d_tile_2d_context context = {
-			.task = task,
-			.argument = argument,
-			.tile_range_kl = fxdiv_init_size_t(tile_range_k * tile_range_l),
-			.range_j = fxdiv_init_size_t(range_j),
-			.tile_range_l = fxdiv_init_size_t(tile_range_l),
+		const size_t tile_range_kl = divide_round_up(range_k, tile_k) * tile_range_l;
+		const struct pthreadpool_4d_tile_2d_params params = {
 			.range_k = range_k,
-			.range_l = range_l,
 			.tile_k = tile_k,
-			.tile_l = tile_l
+			.range_l = range_l,
+			.tile_l = tile_l,
+			.range_j = fxdiv_init_size_t(range_j),
+			.tile_range_kl = fxdiv_init_size_t(tile_range_kl),
+			.tile_range_l = fxdiv_init_size_t(tile_range_l),
 		};
 		pthreadpool_parallelize(
-			threadpool, &thread_parallelize_1d, NULL, 0,
-			(void*) compute_4d_tile_2d, &context, range_i * range_j * tile_range_k * tile_range_l, flags);
+			threadpool, &thread_parallelize_4d_tile_2d, &params, sizeof(params),
+			task, argument, range_i * range_j * tile_range_kl, flags);
 	}
-}
-
-struct compute_4d_tile_2d_with_uarch_context {
-	pthreadpool_task_4d_tile_2d_with_id_t task;
-	void* argument;
-	struct fxdiv_divisor_size_t tile_range_kl;
-	struct fxdiv_divisor_size_t range_j;
-	struct fxdiv_divisor_size_t tile_range_l;
-	size_t range_k;
-	size_t range_l;
-	size_t tile_k;
-	size_t tile_l;
-};
-
-static void compute_4d_tile_2d_with_uarch(const struct compute_4d_tile_2d_with_uarch_context* context, uint32_t uarch_index, size_t linear_index) {
-	const struct fxdiv_divisor_size_t tile_range_kl = context->tile_range_kl;
-	const struct fxdiv_result_size_t tile_index_ij_kl = fxdiv_divide_size_t(linear_index, tile_range_kl);
-	const struct fxdiv_divisor_size_t range_j = context->range_j;
-	const struct fxdiv_result_size_t tile_index_i_j = fxdiv_divide_size_t(tile_index_ij_kl.quotient, range_j);
-	const struct fxdiv_divisor_size_t tile_range_l = context->tile_range_l;
-	const struct fxdiv_result_size_t tile_index_k_l = fxdiv_divide_size_t(tile_index_ij_kl.remainder, tile_range_l);
-	const size_t max_tile_k = context->tile_k;
-	const size_t max_tile_l = context->tile_l;
-	const size_t index_i = tile_index_i_j.quotient;
-	const size_t index_j = tile_index_i_j.remainder;
-	const size_t index_k = tile_index_k_l.quotient * max_tile_k;
-	const size_t index_l = tile_index_k_l.remainder * max_tile_l;
-	const size_t tile_k = min(max_tile_k, context->range_k - index_k);
-	const size_t tile_l = min(max_tile_l, context->range_l - index_l);
-	context->task(context->argument, uarch_index, index_i, index_j, index_k, index_l, tile_k, tile_l);
 }
 
 void pthreadpool_parallelize_4d_tile_2d_with_uarch(
@@ -793,63 +1196,23 @@ void pthreadpool_parallelize_4d_tile_2d_with_uarch(
 			set_fpu_state(saved_fpu_state);
 		}
 	} else {
-		/* Execute in parallel on the thread pool using linearized index */
-		const size_t tile_range_k = divide_round_up(range_k, tile_k);
 		const size_t tile_range_l = divide_round_up(range_l, tile_l);
-		const struct pthreadpool_1d_with_uarch_params params = {
+		const size_t tile_range_kl = divide_round_up(range_k, tile_k) * tile_range_l;
+		const struct pthreadpool_4d_tile_2d_with_uarch_params params = {
 			.default_uarch_index = default_uarch_index,
 			.max_uarch_index = max_uarch_index,
-		};
-		struct compute_4d_tile_2d_with_uarch_context context = {
-			.task = task,
-			.argument = argument,
-			.tile_range_kl = fxdiv_init_size_t(tile_range_k * tile_range_l),
-			.range_j = fxdiv_init_size_t(range_j),
-			.tile_range_l = fxdiv_init_size_t(tile_range_l),
 			.range_k = range_k,
-			.range_l = range_l,
 			.tile_k = tile_k,
-			.tile_l = tile_l
+			.range_l = range_l,
+			.tile_l = tile_l,
+			.range_j = fxdiv_init_size_t(range_j),
+			.tile_range_kl = fxdiv_init_size_t(tile_range_kl),
+			.tile_range_l = fxdiv_init_size_t(tile_range_l),
 		};
 		pthreadpool_parallelize(
-			threadpool, &thread_parallelize_1d_with_uarch, &params, sizeof(params),
-			(void*) compute_4d_tile_2d_with_uarch, &context, range_i * range_j * tile_range_k * tile_range_l, flags);
+			threadpool, &thread_parallelize_4d_tile_2d_with_uarch, &params, sizeof(params),
+			task, argument, range_i * range_j * tile_range_kl, flags);
 	}
-}
-
-struct compute_5d_tile_2d_context {
-	pthreadpool_task_5d_tile_2d_t task;
-	void* argument;
-	struct fxdiv_divisor_size_t tile_range_lm;
-	struct fxdiv_divisor_size_t range_k;
-	struct fxdiv_divisor_size_t tile_range_m;
-	struct fxdiv_divisor_size_t range_j;
-	size_t range_l;
-	size_t range_m;
-	size_t tile_l;
-	size_t tile_m;
-};
-
-static void compute_5d_tile_2d(const struct compute_5d_tile_2d_context* context, size_t linear_index) {
-	const struct fxdiv_divisor_size_t tile_range_lm = context->tile_range_lm;
-	const struct fxdiv_result_size_t tile_index_ijk_lm = fxdiv_divide_size_t(linear_index, tile_range_lm);
-	const struct fxdiv_divisor_size_t range_k = context->range_k;
-	const struct fxdiv_result_size_t tile_index_ij_k = fxdiv_divide_size_t(tile_index_ijk_lm.quotient, range_k);
-	const struct fxdiv_divisor_size_t tile_range_m = context->tile_range_m;
-	const struct fxdiv_result_size_t tile_index_l_m = fxdiv_divide_size_t(tile_index_ijk_lm.remainder, tile_range_m);
-	const struct fxdiv_divisor_size_t range_j = context->range_j;
-	const struct fxdiv_result_size_t tile_index_i_j = fxdiv_divide_size_t(tile_index_ij_k.quotient, range_j);
-
-	const size_t max_tile_l = context->tile_l;
-	const size_t max_tile_m = context->tile_m;
-	const size_t index_i = tile_index_i_j.quotient;
-	const size_t index_j = tile_index_i_j.remainder;
-	const size_t index_k = tile_index_ij_k.remainder;
-	const size_t index_l = tile_index_l_m.quotient * max_tile_l;
-	const size_t index_m = tile_index_l_m.remainder * max_tile_m;
-	const size_t tile_l = min(max_tile_l, context->range_l - index_l);
-	const size_t tile_m = min(max_tile_m, context->range_m - index_m);
-	context->task(context->argument, index_i, index_j, index_k, index_l, index_m, tile_l, tile_m);
 }
 
 void pthreadpool_parallelize_5d_tile_2d(
@@ -888,64 +1251,22 @@ void pthreadpool_parallelize_5d_tile_2d(
 			set_fpu_state(saved_fpu_state);
 		}
 	} else {
-		/* Execute in parallel on the thread pool using linearized index */
-		const size_t tile_range_l = divide_round_up(range_l, tile_l);
 		const size_t tile_range_m = divide_round_up(range_m, tile_m);
-		struct compute_5d_tile_2d_context context = {
-			.task = task,
-			.argument = argument,
-			.tile_range_lm = fxdiv_init_size_t(tile_range_l * tile_range_m),
-			.range_k = fxdiv_init_size_t(range_k),
-			.tile_range_m = fxdiv_init_size_t(tile_range_m),
-			.range_j = fxdiv_init_size_t(range_j),
+		const size_t tile_range_lm = divide_round_up(range_l, tile_l) * tile_range_m;
+		const struct pthreadpool_5d_tile_2d_params params = {
 			.range_l = range_l,
-			.range_m = range_m,
 			.tile_l = tile_l,
+			.range_m = range_m,
 			.tile_m = tile_m,
+			.range_j = fxdiv_init_size_t(range_j),
+			.range_k = fxdiv_init_size_t(range_k),
+			.tile_range_lm = fxdiv_init_size_t(tile_range_lm),
+			.tile_range_m = fxdiv_init_size_t(tile_range_m),
 		};
 		pthreadpool_parallelize(
-			threadpool, &thread_parallelize_1d, NULL, 0,
-			(void*) compute_5d_tile_2d, &context, range_i * range_j * range_k * tile_range_l * tile_range_m, flags);
+			threadpool, &thread_parallelize_5d_tile_2d, &params, sizeof(params),
+			task, argument, range_i * range_j * range_k * tile_range_lm, flags);
 	}
-}
-
-struct compute_6d_tile_2d_context {
-	pthreadpool_task_6d_tile_2d_t task;
-	void* argument;
-	struct fxdiv_divisor_size_t tile_range_lmn;
-	struct fxdiv_divisor_size_t range_k;
-	struct fxdiv_divisor_size_t tile_range_n;
-	struct fxdiv_divisor_size_t range_j;
-	struct fxdiv_divisor_size_t tile_range_m;
-	size_t range_m;
-	size_t range_n;
-	size_t tile_m;
-	size_t tile_n;
-};
-
-static void compute_6d_tile_2d(const struct compute_6d_tile_2d_context* context, size_t linear_index) {
-	const struct fxdiv_divisor_size_t tile_range_lmn = context->tile_range_lmn;
-	const struct fxdiv_result_size_t tile_index_ijk_lmn = fxdiv_divide_size_t(linear_index, tile_range_lmn);
-	const struct fxdiv_divisor_size_t range_k = context->range_k;
-	const struct fxdiv_result_size_t tile_index_ij_k = fxdiv_divide_size_t(tile_index_ijk_lmn.quotient, range_k);
-	const struct fxdiv_divisor_size_t tile_range_n = context->tile_range_n;
-	const struct fxdiv_result_size_t tile_index_lm_n = fxdiv_divide_size_t(tile_index_ijk_lmn.remainder, tile_range_n);
-	const struct fxdiv_divisor_size_t range_j = context->range_j;
-	const struct fxdiv_result_size_t tile_index_i_j = fxdiv_divide_size_t(tile_index_ij_k.quotient, range_j);
-	const struct fxdiv_divisor_size_t tile_range_m = context->tile_range_m;
-	const struct fxdiv_result_size_t tile_index_l_m = fxdiv_divide_size_t(tile_index_lm_n.quotient, tile_range_m);
-
-	const size_t max_tile_m = context->tile_m;
-	const size_t max_tile_n = context->tile_n;
-	const size_t index_i = tile_index_i_j.quotient;
-	const size_t index_j = tile_index_i_j.remainder;
-	const size_t index_k = tile_index_ij_k.remainder;
-	const size_t index_l = tile_index_l_m.quotient;
-	const size_t index_m = tile_index_l_m.remainder * max_tile_m;
-	const size_t index_n = tile_index_lm_n.remainder * max_tile_n;
-	const size_t tile_m = min(max_tile_m, context->range_m - index_m);
-	const size_t tile_n = min(max_tile_n, context->range_n - index_n);
-	context->task(context->argument, index_i, index_j, index_k, index_l, index_m, index_n, tile_m, tile_n);
 }
 
 void pthreadpool_parallelize_6d_tile_2d(
@@ -987,24 +1308,23 @@ void pthreadpool_parallelize_6d_tile_2d(
 			set_fpu_state(saved_fpu_state);
 		}
 	} else {
-		/* Execute in parallel on the thread pool using linearized index */
-		const size_t tile_range_m = divide_round_up(range_m, tile_m);
+		const size_t range_kl = range_k * range_l;
 		const size_t tile_range_n = divide_round_up(range_n, tile_n);
-		struct compute_6d_tile_2d_context context = {
-			.task = task,
-			.argument = argument,
-			.tile_range_lmn = fxdiv_init_size_t(range_l * tile_range_m * tile_range_n),
-			.range_k = fxdiv_init_size_t(range_k),
-			.tile_range_n = fxdiv_init_size_t(tile_range_n),
-			.range_j = fxdiv_init_size_t(range_j),
-			.tile_range_m = fxdiv_init_size_t(tile_range_m),
+		const size_t tile_range_mn = divide_round_up(range_m, tile_m) * tile_range_n;
+		const struct pthreadpool_6d_tile_2d_params params = {
+			.range_k = range_k,
 			.range_m = range_m,
-			.range_n = range_n,
 			.tile_m = tile_m,
+			.range_n = range_n,
 			.tile_n = tile_n,
+			.range_j = fxdiv_init_size_t(range_j),
+			.range_kl = fxdiv_init_size_t(range_kl),
+			.range_l = fxdiv_init_size_t(range_l),
+			.tile_range_mn = fxdiv_init_size_t(tile_range_mn),
+			.tile_range_n = fxdiv_init_size_t(tile_range_n),
 		};
 		pthreadpool_parallelize(
-			threadpool, &thread_parallelize_1d, NULL, 0,
-			(void*) compute_6d_tile_2d, &context, range_i * range_j * range_k * range_l * tile_range_m * tile_range_n, flags);
+			threadpool, &thread_parallelize_6d_tile_2d, &params, sizeof(params),
+			task, argument, range_i * range_j * range_kl * tile_range_mn, flags);
 	}
 }
