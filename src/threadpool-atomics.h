@@ -69,9 +69,9 @@
 		__c11_atomic_store(address, value, __ATOMIC_RELEASE);
 	}
 
-	static inline uint32_t pthreadpool_fetch_sub_relaxed_size_t(
+	static inline size_t pthreadpool_fetch_sub_relaxed_size_t(
 		pthreadpool_atomic_size_t* address,
-		uint32_t decrement)
+		size_t decrement)
 	{
 		return __c11_atomic_fetch_sub(address, decrement, __ATOMIC_RELAXED);
 	}
@@ -152,9 +152,9 @@
 		atomic_store_explicit(address, value, memory_order_release);
 	}
 
-	static inline uint32_t pthreadpool_fetch_sub_relaxed_size_t(
+	static inline size_t pthreadpool_fetch_sub_relaxed_size_t(
 		pthreadpool_atomic_size_t* address,
-		uint32_t decrement)
+		size_t decrement)
 	{
 		return atomic_fetch_sub_explicit(address, decrement, memory_order_relaxed);
 	}
