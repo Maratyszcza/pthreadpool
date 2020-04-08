@@ -13,7 +13,7 @@ It provides similar functionality to `#pragma omp parallel for`, but with additi
 * Run on user-specified or auto-detected number of threads.
 * Work-stealing scheduling for efficient work balancing.
 * Wait-free synchronization of work items.
-* Compatible with Linux (including Android), macOS, iOS, MinGW, Emscripten environments.
+* Compatible with Linux (including Android), macOS, iOS, Windows, Emscripten environments.
 * 100% unit tests coverage.
 * Throughput and latency microbenchmarks.
 

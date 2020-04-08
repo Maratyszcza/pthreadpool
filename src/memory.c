@@ -11,11 +11,10 @@
 
 /* Windows headers */
 #ifdef _WIN32
-	#define NOMINMAX
 	#include <malloc.h>
 #endif
 
-/* Internal headers */
+/* Internal library headers */
 #include "threadpool-common.h"
 #include "threadpool-object.h"
 

@@ -22,8 +22,16 @@
 	#endif
 #endif
 
+#ifndef PTHREADPOOL_USE_EVENT
+	#if defined(_WIN32)
+		#define PTHREADPOOL_USE_EVENT 1
+	#else
+		#define PTHREADPOOL_USE_EVENT 0
+	#endif
+#endif
+
 #ifndef PTHREADPOOL_USE_CONDVAR
-	#if PTHREADPOOL_USE_GCD || PTHREADPOOL_USE_FUTEX
+	#if PTHREADPOOL_USE_GCD || PTHREADPOOL_USE_FUTEX || PTHREADPOOL_USE_EVENT
 		#define PTHREADPOOL_USE_CONDVAR 0
 	#else
 		#define PTHREADPOOL_USE_CONDVAR 1
@@ -35,7 +43,13 @@
 #define PTHREADPOOL_SPIN_WAIT_ITERATIONS 1000000
 
 #define PTHREADPOOL_CACHELINE_SIZE 64
-#define PTHREADPOOL_CACHELINE_ALIGNED __attribute__((__aligned__(PTHREADPOOL_CACHELINE_SIZE)))
+#if defined(__GNUC__)
+	#define PTHREADPOOL_CACHELINE_ALIGNED __attribute__((__aligned__(PTHREADPOOL_CACHELINE_SIZE)))
+#elif defined(_MSC_VER)
+	#define PTHREADPOOL_CACHELINE_ALIGNED __declspec(align(PTHREADPOOL_CACHELINE_SIZE))
+#else
+	#error "Platform-specific implementation of PTHREADPOOL_CACHELINE_ALIGNED required"
+#endif
 
 #if defined(__clang__)
 	#if __has_extension(c_static_assert) || __has_feature(c_static_assert)

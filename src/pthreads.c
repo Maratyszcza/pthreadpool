@@ -38,7 +38,6 @@
 
 /* Windows-specific headers */
 #ifdef _WIN32
-	#define NOMINMAX
 	#include <sysinfoapi.h>
 #endif
 

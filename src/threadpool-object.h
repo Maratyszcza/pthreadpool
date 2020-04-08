@@ -18,6 +18,11 @@
 #include <dispatch/dispatch.h>
 #endif
 
+/* Windows headers */
+#if PTHREADPOOL_USE_EVENT
+#include <windows.h>
+#endif
+
 /* Dependencies */
 #include <fxdiv.h>
 
@@ -64,6 +69,12 @@ struct PTHREADPOOL_CACHELINE_ALIGNED thread_info {
 	 * The pthread object corresponding to the thread.
 	 */
 	pthread_t thread_object;
+#endif
+#if PTHREADPOOL_USE_EVENT
+	/**
+	 * The Windows thread handle corresponding to the thread.
+	 */
+	HANDLE thread_handle;
 #endif
 };
 
@@ -446,6 +457,12 @@ struct PTHREADPOOL_CACHELINE_ALIGNED pthreadpool {
 	 */
 	dispatch_semaphore_t execution_semaphore;
 #endif
+#if PTHREADPOOL_USE_EVENT
+	/**
+	 * Serializes concurrent calls to @a pthreadpool_parallelize_* from different threads.
+	 */
+	HANDLE execution_mutex;
+#endif
 #if PTHREADPOOL_USE_CONDVAR
 	/**
 	 * Guards access to the @a active_threads variable.
@@ -463,6 +480,20 @@ struct PTHREADPOOL_CACHELINE_ALIGNED pthreadpool {
 	 * Condition variable to wait for change of the @a command variable.
 	 */
 	pthread_cond_t command_condvar;
+#endif
+#if PTHREADPOOL_USE_EVENT
+	/**
+	 * Events to wait on until all threads complete an operation (until @a active_threads is zero).
+	 * To avoid race conditions due to spin-lock synchronization, we use two events and switch event in use after every
+	 * submitted command according to the high bit of the command word.
+	 */
+	HANDLE completion_event[2];
+	/**
+	 * Events to wait on for change of the @a command variable.
+	 * To avoid race conditions due to spin-lock synchronization, we use two events and switch event in use after every
+	 * submitted command according to the high bit of the command word.
+	 */
+	HANDLE command_event[2];
 #endif
 	/**
 	 * The number of threads in the thread pool. Never changes after pthreadpool_create.

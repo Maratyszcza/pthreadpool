@@ -4,6 +4,13 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/* MSVC-specific headers */
+#ifdef _MSC_VER
+	#include <intrin.h>
+	#include <immintrin.h>
+#endif
+
+
 #if defined(__wasm__) && defined(__EMSCRIPTEN_PTHREADS__) && defined(__clang__)
 	/*
 	 * Clang for WebAssembly target lacks stdatomic.h header,
@@ -91,6 +98,178 @@
 
 	static inline void pthreadpool_fence_release() {
 		__c11_atomic_thread_fence(__ATOMIC_RELEASE);
+	}
+#elif defined(_MSC_VER) && (defined(_M_X64) || defined(_M_AMD64))
+	typedef volatile uint32_t pthreadpool_atomic_uint32_t;
+	typedef volatile size_t   pthreadpool_atomic_size_t;
+	typedef void *volatile    pthreadpool_atomic_void_p;
+
+	static inline uint32_t pthreadpool_load_relaxed_uint32_t(
+		pthreadpool_atomic_uint32_t* address)
+	{
+		return *address;
+	}
+
+	static inline size_t pthreadpool_load_relaxed_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		return *address;
+	}
+
+	static inline void* pthreadpool_load_relaxed_void_p(
+		pthreadpool_atomic_void_p* address)
+	{
+		return *address;
+	}
+
+	static inline void pthreadpool_store_relaxed_uint32_t(
+		pthreadpool_atomic_uint32_t* address,
+		uint32_t value)
+	{
+		*address = value;
+	}
+
+	static inline void pthreadpool_store_relaxed_size_t(
+		pthreadpool_atomic_size_t* address,
+		size_t value)
+	{
+		*address = value;
+	}
+
+	static inline void pthreadpool_store_relaxed_void_p(
+		pthreadpool_atomic_void_p* address,
+		void* value)
+	{
+		*address = value;
+	}
+
+	static inline void pthreadpool_store_release_uint32_t(
+		pthreadpool_atomic_uint32_t* address,
+		uint32_t value)
+	{
+		/* x86-64 stores always have release semantics */
+		*address = value;
+	}
+
+	static inline void pthreadpool_store_release_size_t(
+		pthreadpool_atomic_size_t* address,
+		size_t value)
+	{
+		/* x86-64 stores always have release semantics */
+		*address = value;
+	}
+
+	static inline size_t pthreadpool_fetch_sub_relaxed_size_t(
+		pthreadpool_atomic_size_t* address,
+		size_t decrement)
+	{
+		return (size_t) _InterlockedExchangeAdd64((__int64 volatile*) address, (__int64) -decrement);
+	}
+
+	static inline bool pthreadpool_compare_exchange_weak_relaxed_size_t(
+		pthreadpool_atomic_size_t* address,
+		size_t* expected_value,
+		size_t new_value)
+	{
+		const __int64 expected_old_value = *expected_value;
+		const __int64 actual_old_value = _InterlockedCompareExchange64(
+			(__int64 volatile*) address, (__int64) new_value, expected_old_value);
+		*expected_value = (size_t) actual_old_value;
+		return actual_old_value == expected_old_value;
+	}
+
+	static inline void pthreadpool_fence_acquire() {
+		_mm_lfence();
+	}
+
+	static inline void pthreadpool_fence_release() {
+		_mm_sfence();
+	}
+#elif defined(_MSC_VER) && defined(_M_IX86)
+	typedef volatile uint32_t pthreadpool_atomic_uint32_t;
+	typedef volatile size_t   pthreadpool_atomic_size_t;
+	typedef void *volatile    pthreadpool_atomic_void_p;
+
+	static inline uint32_t pthreadpool_load_relaxed_uint32_t(
+		pthreadpool_atomic_uint32_t* address)
+	{
+		return *address;
+	}
+
+	static inline size_t pthreadpool_load_relaxed_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		return *address;
+	}
+
+	static inline void* pthreadpool_load_relaxed_void_p(
+		pthreadpool_atomic_void_p* address)
+	{
+		return *address;
+	}
+
+	static inline void pthreadpool_store_relaxed_uint32_t(
+		pthreadpool_atomic_uint32_t* address,
+		uint32_t value)
+	{
+		*address = value;
+	}
+
+	static inline void pthreadpool_store_relaxed_size_t(
+		pthreadpool_atomic_size_t* address,
+		size_t value)
+	{
+		*address = value;
+	}
+
+	static inline void pthreadpool_store_relaxed_void_p(
+		pthreadpool_atomic_void_p* address,
+		void* value)
+	{
+		*address = value;
+	}
+
+	static inline void pthreadpool_store_release_uint32_t(
+		pthreadpool_atomic_uint32_t* address,
+		uint32_t value)
+	{
+		/* x86 stores always have release semantics */
+		*address = value;
+	}
+
+	static inline void pthreadpool_store_release_size_t(
+		pthreadpool_atomic_size_t* address,
+		size_t value)
+	{
+		/* x86 stores always have release semantics */
+		*address = value;
+	}
+
+	static inline size_t pthreadpool_fetch_sub_relaxed_size_t(
+		pthreadpool_atomic_size_t* address,
+		size_t decrement)
+	{
+		return (size_t) _InterlockedExchangeAdd((long volatile*) address, (long) -decrement);
+	}
+
+	static inline bool pthreadpool_compare_exchange_weak_relaxed_size_t(
+		pthreadpool_atomic_size_t* address,
+		size_t* expected_value,
+		size_t new_value)
+	{
+		const long expected_old_value = *expected_value;
+		const long actual_old_value = _InterlockedCompareExchange(
+			(long volatile*) address, (long) new_value, expected_old_value);
+		*expected_value = (size_t) actual_old_value;
+		return actual_old_value == expected_old_value;
+	}
+
+	static inline void pthreadpool_fence_acquire() {
+		_mm_lfence();
+	}
+
+	static inline void pthreadpool_fence_release() {
+		_mm_sfence();
 	}
 #else
 	#include <stdatomic.h>

@@ -1,12 +1,12 @@
 /* Standard C headers */
 #include <stddef.h>
 
-/* Library header */
+/* Public library header */
 #include <pthreadpool.h>
 
-static inline size_t min(size_t a, size_t b) {
-	return a < b ? a : b;
-}
+/* Internal library headers */
+#include "threadpool-utils.h"
+
 
 struct pthreadpool* pthreadpool_create(size_t threads_count) {
 	return NULL;

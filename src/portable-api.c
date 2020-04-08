@@ -12,13 +12,13 @@
 /* Dependencies */
 #include <fxdiv.h>
 
-/* Library header */
+/* Public library header */
 #include <pthreadpool.h>
 
-/* Internal headers */
-#include "threadpool-utils.h"
+/* Internal library headers */
 #include "threadpool-atomics.h"
 #include "threadpool-object.h"
+#include "threadpool-utils.h"
 
 
 size_t pthreadpool_get_threads_count(struct pthreadpool* threadpool) {
