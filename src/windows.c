@@ -1,6 +1,5 @@
 /* Standard C headers */
 #include <assert.h>
-#include <limits.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -352,7 +351,7 @@ void pthreadpool_destroy(struct pthreadpool* threadpool) {
 					const BOOL close_status = CloseHandle(threadpool->command_event[i]);
 					assert(close_status != FALSE);
 				}
-				if (threadpool->completion_event != NULL) {
+				if (threadpool->completion_event[i] != NULL) {
 					const BOOL close_status = CloseHandle(threadpool->completion_event[i]);
 					assert(close_status != FALSE);
 				}
