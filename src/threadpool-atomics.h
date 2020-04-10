@@ -83,13 +83,18 @@
 		return __c11_atomic_fetch_sub(address, decrement, __ATOMIC_RELAXED);
 	}
 
-	static inline bool pthreadpool_compare_exchange_weak_relaxed_size_t(
-		pthreadpool_atomic_size_t* address,
-		size_t* expected_value,
-		size_t new_value)
+	static inline bool pthreadpool_try_decrement_relaxed_size_t(
+		pthreadpool_atomic_size_t* value)
 	{
-		return __c11_atomic_compare_exchange_weak(
-			address, expected_value, new_value, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
+		size_t actual_value = __c11_atomic_load(value, __ATOMIC_RELAXED);
+		while (actual_value != 0) {
+			if (__c11_atomic_compare_exchange_weak(
+				value, &actual_value, actual_value - 1, __ATOMIC_RELAXED, __ATOMIC_RELAXED))
+			{
+				return true;
+			}
+		}
+		return false;
 	}
 
 	static inline void pthreadpool_fence_acquire() {
@@ -166,16 +171,20 @@
 		return (size_t) _InterlockedExchangeAdd64((__int64 volatile*) address, (__int64) -decrement);
 	}
 
-	static inline bool pthreadpool_compare_exchange_weak_relaxed_size_t(
-		pthreadpool_atomic_size_t* address,
-		size_t* expected_value,
-		size_t new_value)
+	static inline bool pthreadpool_try_decrement_relaxed_size_t(
+		pthreadpool_atomic_size_t* value)
 	{
-		const __int64 expected_old_value = *expected_value;
-		const __int64 actual_old_value = _InterlockedCompareExchange64(
-			(__int64 volatile*) address, (__int64) new_value, expected_old_value);
-		*expected_value = (size_t) actual_old_value;
-		return actual_old_value == expected_old_value;
+		size_t actual_value = *value;
+		while (actual_value != 0) {
+			const size_t new_value = actual_value - 1;
+			const size_t expected_value = actual_value;
+			actual_value = _InterlockedCompareExchange64(
+				(__int64 volatile*) value, (__int64) new_value, (__int64) expected_value);
+			if (actual_value == expected_value) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	static inline void pthreadpool_fence_acquire() {
@@ -252,16 +261,20 @@
 		return (size_t) _InterlockedExchangeAdd((long volatile*) address, (long) -decrement);
 	}
 
-	static inline bool pthreadpool_compare_exchange_weak_relaxed_size_t(
-		pthreadpool_atomic_size_t* address,
-		size_t* expected_value,
-		size_t new_value)
+	static inline bool pthreadpool_try_decrement_relaxed_size_t(
+		pthreadpool_atomic_size_t* value)
 	{
-		const long expected_old_value = *expected_value;
-		const long actual_old_value = _InterlockedCompareExchange(
-			(long volatile*) address, (long) new_value, expected_old_value);
-		*expected_value = (size_t) actual_old_value;
-		return actual_old_value == expected_old_value;
+		size_t actual_value = *value;
+		while (actual_value != 0) {
+			const size_t new_value = actual_value - 1;
+			const size_t expected_value = actual_value;
+			actual_value = _InterlockedCompareExchange(
+				(long volatile*) value, (long) new_value, (long) expected_value);
+			if (actual_value == expected_value) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	static inline void pthreadpool_fence_acquire() {
@@ -338,13 +351,30 @@
 		return atomic_fetch_sub_explicit(address, decrement, memory_order_relaxed);
 	}
 
-	static inline bool pthreadpool_compare_exchange_weak_relaxed_size_t(
-		pthreadpool_atomic_size_t* address,
-		size_t* expected_value,
-		size_t new_value)
+	static inline bool pthreadpool_try_decrement_relaxed_size_t(
+		pthreadpool_atomic_size_t* value)
 	{
-		return atomic_compare_exchange_weak_explicit(
-			address, expected_value, new_value, memory_order_relaxed, memory_order_relaxed);
+		#if defined(__clang__) && (defined(__arm__) || defined(__aarch64__))
+			size_t actual_value;
+			do {
+				actual_value = __builtin_arm_ldrex((const volatile size_t*) value);
+				if (actual_value == 0) {
+					__builtin_arm_clrex();
+					return false;
+				}
+			} while (__builtin_arm_strex(actual_value - 1, (volatile size_t*) value) != 0);
+			return true;
+		#else
+			size_t actual_value = pthreadpool_load_relaxed_size_t(value);
+			while (actual_value != 0) {
+				if (atomic_compare_exchange_weak_explicit(
+					value, &actual_value, actual_value - 1, memory_order_relaxed, memory_order_relaxed))
+				{
+					return true;
+				}
+			}
+			return false;
+		#endif
 	}
 
 	static inline void pthreadpool_fence_acquire() {
@@ -355,30 +385,3 @@
 		atomic_thread_fence(memory_order_release);
 	}
 #endif
-
-static inline bool pthreadpool_try_decrement_relaxed_size_t(
-	pthreadpool_atomic_size_t* value)
-{
-	#if defined(__clang__) && (defined(__arm__) || defined(__aarch64__))
-		size_t actual_value;
-		do {
-			actual_value = __builtin_arm_ldrex((const volatile size_t*) value);
-			if (actual_value == 0) {
-				__builtin_arm_clrex();
-				return false;
-			}
-		} while (__builtin_arm_strex(actual_value - 1, (volatile size_t*) value) != 0);
-		return true;
-	#else
-		size_t actual_value = pthreadpool_load_relaxed_size_t(value);
-		if (actual_value == 0) {
-			return false;
-		}
-		while (!pthreadpool_compare_exchange_weak_relaxed_size_t(value, &actual_value, actual_value - 1)) {
-			if (actual_value == 0) {
-				return false;
-			}
-		}
-		return true;
-	#endif
-}
