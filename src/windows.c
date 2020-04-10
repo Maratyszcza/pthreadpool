@@ -254,6 +254,17 @@ PTHREADPOOL_INTERNAL void pthreadpool_parallelize(
 	const uint32_t new_command = ~(old_command | THREADPOOL_COMMAND_MASK) | threadpool_command_parallelize;
 
 	/*
+	 * Reset the command event for the next command.
+	 * It is important to reset the event before writing out the new command, because as soon as the worker threads
+	 * observe the new command, they may process it and switch to waiting on the next command event.
+	 *
+	 * Note: the event is different from the command event signalled in this update.
+	 */
+	const uint32_t event_index = (old_command >> 31);
+	BOOL reset_event_status = ResetEvent(threadpool->command_event[event_index ^ 1]);
+	assert(reset_event_status != FALSE);
+
+	/*
 	 * Store the command with release semantics to guarantee that if a worker thread observes
 	 * the new command value, it also observes the updated command parameters.
 	 *
@@ -267,7 +278,6 @@ PTHREADPOOL_INTERNAL void pthreadpool_parallelize(
 	 * Event in use must be switched after every submitted command to avoid race conditions.
 	 * Choose the event based on the high bit of the command, which is flipped on every update.
 	 */
-	const uint32_t event_index = (old_command >> 31);
 	const BOOL set_event_status = SetEvent(threadpool->command_event[event_index]);
 	assert(set_event_status != FALSE);
 
@@ -293,11 +303,9 @@ PTHREADPOOL_INTERNAL void pthreadpool_parallelize(
 	wait_worker_threads(threadpool, event_index ^ 1);
 
 	/*
-	 * Reset events for the next command.
-	 * Note: the reset events are different from the events used for synchronization in this update.
+	 * Reset the completion event for the next command.
+	 * Note: the event is different from the one used for waiting in this update.
 	 */
-	BOOL reset_event_status = ResetEvent(threadpool->command_event[event_index ^ 1]);
-	assert(reset_event_status != FALSE);
 	reset_event_status = ResetEvent(threadpool->completion_event[event_index]);
 	assert(reset_event_status != FALSE);
 
