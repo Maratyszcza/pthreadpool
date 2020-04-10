@@ -70,25 +70,6 @@ static inline void disable_fpu_denormals() {
 #endif
 }
 
-static inline size_t multiply_divide(size_t a, size_t b, size_t d) {
-	#if defined(__SIZEOF_SIZE_T__) && (__SIZEOF_SIZE_T__ == 4)
-		return (size_t) (((uint64_t) a) * ((uint64_t) b)) / ((uint64_t) d);
-	#elif defined(__SIZEOF_SIZE_T__) && (__SIZEOF_SIZE_T__ == 8) && defined(__SIZEOF_INT128__)
-		return (size_t) (((__uint128_t) a) * ((__uint128_t) b)) / ((__uint128_t) d);
-	#elif (defined(_MSC_VER) && _MSC_VER >= 1920) && (defined(_M_AMD64) || defined(_M_X64))
-		uint64_t product_hi;
-		const uint64_t product_lo = _umul128(a, b, &product_hi);
-		uint64_t remainder;
-		return (size_t) _udiv128(product_hi, product_lo, d, &remainder);
-	#elif (defined(_MSC_VER) && _MSC_VER >= 1920) && defined(_M_IX86)
-		const unsigned __int64 product_full = __emulu((unsigned int) a, (unsigned int) b);
-		unsigned int remainder;
-		return (size_t) _udiv64(product_full, (unsigned int) d, &remainder);
-	#else
-		#error "Platform-specific implementation of multiply_divide required"
-	#endif
-}
-
 static inline size_t modulo_decrement(size_t i, size_t n) {
 	/* Wrap modulo n, if needed */
 	if (i == 0) {

@@ -21,7 +21,6 @@
 #include "threadpool-object.h"
 #include "threadpool-utils.h"
 
-
 static void thread_main(void* arg, size_t thread_index) {
 	struct pthreadpool* threadpool = (struct pthreadpool*) arg;
 	struct thread_info* thread = &threadpool->threads[thread_index];
@@ -62,7 +61,7 @@ struct pthreadpool* pthreadpool_create(size_t threads_count) {
 	if (threadpool == NULL) {
 		return NULL;
 	}
-	threadpool->threads_count = threads_count;
+	threadpool->threads_count = fxdiv_init_size_t(threads_count);
 	for (size_t tid = 0; tid < threads_count; tid++) {
 		threadpool->threads[tid].thread_number = tid;
 	}
@@ -99,26 +98,28 @@ PTHREADPOOL_INTERNAL void pthreadpool_parallelize(
 	pthreadpool_store_relaxed_uint32_t(&threadpool->flags, flags);
 
 	/* Locking of completion_mutex not needed: readers are sleeping on command_condvar */
-	const size_t threads_count = threadpool->threads_count;
+	const struct fxdiv_divisor_size_t threads_count = threadpool->threads_count;
 
 	if (params_size != 0) {
 		memcpy(&threadpool->params, params, params_size);
 	}
 
 	/* Spread the work between threads */
+	const struct fxdiv_result_size_t range_params = fxdiv_divide_size_t(linear_range, threads_count);
 	size_t range_start = 0;
-	for (size_t tid = 0; tid < threads_count; tid++) {
+	for (size_t tid = 0; tid < threads_count.value; tid++) {
 		struct thread_info* thread = &threadpool->threads[tid];
-		const size_t range_end = multiply_divide(linear_range, tid + 1, threads_count);
+		const size_t range_length = range_params.quotient + (size_t) (tid < range_params.remainder);
+		const size_t range_end = range_start + range_length;
 		pthreadpool_store_relaxed_size_t(&thread->range_start, range_start);
 		pthreadpool_store_relaxed_size_t(&thread->range_end, range_end);
-		pthreadpool_store_relaxed_size_t(&thread->range_length, range_end - range_start);
+		pthreadpool_store_relaxed_size_t(&thread->range_length, range_length);
 
 		/* The next subrange starts where the previous ended */
 		range_start = range_end;
 	}
 
-	dispatch_apply_f(threads_count, DISPATCH_APPLY_AUTO, threadpool, thread_main);
+	dispatch_apply_f(threads_count.value, DISPATCH_APPLY_AUTO, threadpool, thread_main);
 
 	/* Unprotect the global threadpool structures */
 	dispatch_semaphore_signal(threadpool->execution_semaphore);

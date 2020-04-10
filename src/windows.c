@@ -151,7 +151,7 @@ struct pthreadpool* pthreadpool_create(size_t threads_count) {
 	if (threadpool == NULL) {
 		return NULL;
 	}
-	threadpool->threads_count = threads_count;
+	threadpool->threads_count = fxdiv_init_size_t(threads_count);
 	for (size_t tid = 0; tid < threads_count; tid++) {
 		threadpool->threads[tid].thread_number = tid;
 		threadpool->threads[tid].threadpool = threadpool;
@@ -220,8 +220,8 @@ PTHREADPOOL_INTERNAL void pthreadpool_parallelize(
 	pthreadpool_store_relaxed_void_p(&threadpool->argument, context);
 	pthreadpool_store_relaxed_uint32_t(&threadpool->flags, flags);
 
-	const size_t threads_count = threadpool->threads_count;
-	pthreadpool_store_relaxed_size_t(&threadpool->active_threads, threads_count - 1 /* caller thread */);
+	const struct fxdiv_divisor_size_t threads_count = threadpool->threads_count;
+	pthreadpool_store_relaxed_size_t(&threadpool->active_threads, threads_count.value - 1 /* caller thread */);
 
 	if (params_size != 0) {
 		CopyMemory(&threadpool->params, params, params_size);
@@ -229,13 +229,15 @@ PTHREADPOOL_INTERNAL void pthreadpool_parallelize(
 	}
 
 	/* Spread the work between threads */
+	const struct fxdiv_result_size_t range_params = fxdiv_divide_size_t(linear_range, threads_count);
 	size_t range_start = 0;
-	for (size_t tid = 0; tid < threads_count; tid++) {
+	for (size_t tid = 0; tid < threads_count.value; tid++) {
 		struct thread_info* thread = &threadpool->threads[tid];
-		const size_t range_end = multiply_divide(linear_range, tid + 1, threads_count);
+		const size_t range_length = range_params.quotient + (size_t) (tid < range_params.remainder);
+		const size_t range_end = range_start + range_length;
 		pthreadpool_store_relaxed_size_t(&thread->range_start, range_start);
 		pthreadpool_store_relaxed_size_t(&thread->range_end, range_end);
-		pthreadpool_store_relaxed_size_t(&thread->range_length, range_end - range_start);
+		pthreadpool_store_relaxed_size_t(&thread->range_length, range_length);
 
 		/* The next subrange starts where the previous ended */
 		range_start = range_end;
@@ -309,7 +311,7 @@ PTHREADPOOL_INTERNAL void pthreadpool_parallelize(
 
 void pthreadpool_destroy(struct pthreadpool* threadpool) {
 	if (threadpool != NULL) {
-		const size_t threads_count = threadpool->threads_count;
+		const size_t threads_count = threadpool->threads_count.value;
 		if (threads_count > 1) {
 			pthreadpool_store_relaxed_size_t(&threadpool->active_threads, threads_count - 1 /* caller thread */);
 

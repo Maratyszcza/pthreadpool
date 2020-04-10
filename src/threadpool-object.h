@@ -496,9 +496,10 @@ struct PTHREADPOOL_CACHELINE_ALIGNED pthreadpool {
 	HANDLE command_event[2];
 #endif
 	/**
-	 * The number of threads in the thread pool. Never changes after pthreadpool_create.
+	 * FXdiv divisor for the number of threads in the thread pool.
+	 * This struct never change after pthreadpool_create.
 	 */
-	size_t threads_count;
+	struct fxdiv_divisor_size_t threads_count;
 	/**
 	 * Thread information structures that immediately follow this structure.
 	 */
