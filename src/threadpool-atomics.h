@@ -152,7 +152,8 @@
 		pthreadpool_atomic_uint32_t* address,
 		uint32_t value)
 	{
-		/* x86-64 stores always have release semantics */
+		/* x86-64 stores always have release semantics; use only a compiler barrier */
+		_WriteBarrier();
 		*address = value;
 	}
 
@@ -160,7 +161,8 @@
 		pthreadpool_atomic_size_t* address,
 		size_t value)
 	{
-		/* x86-64 stores always have release semantics */
+		/* x86-64 stores always have release semantics; use only a compiler barrier */
+		_WriteBarrier();
 		*address = value;
 	}
 
@@ -189,9 +191,11 @@
 
 	static inline void pthreadpool_fence_acquire() {
 		_mm_lfence();
+		_ReadBarrier();
 	}
 
 	static inline void pthreadpool_fence_release() {
+		_WriteBarrier();
 		_mm_sfence();
 	}
 #elif defined(_MSC_VER) && defined(_M_IX86)
