@@ -8,7 +8,17 @@
 #include "threadpool-utils.h"
 
 
+struct pthreadpool {
+};
+
+static const struct pthreadpool static_pthreadpool = { };
+
+
 struct pthreadpool* pthreadpool_create(size_t threads_count) {
+	if (threads_count <= 1) {
+		return (struct pthreadpool*) &static_pthreadpool;
+	}
+
 	return NULL;
 }
 
