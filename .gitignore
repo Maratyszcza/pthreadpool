@@ -2,12 +2,18 @@
 build.ninja
 
 # Build objects and artifacts
-deps/
-build/
+bazel-bin
+bazel-genfiles
+bazel-out
+bazel-testlogs
+bazel-pthreadpool
 bin/
-obj/
+build/
+build-*/
+deps/
 lib/
 libs/
+obj/
 *.pyc
 *.pyo
 
