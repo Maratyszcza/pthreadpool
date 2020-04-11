@@ -7,7 +7,9 @@
 /* MSVC-specific headers */
 #ifdef _MSC_VER
 	#include <intrin.h>
-	#include <immintrin.h>
+	#if defined(_M_IX86) || defined(_M_X64) || defined(_M_AMD64)
+		#include <immintrin.h>
+	#endif
 #endif
 
 
@@ -168,7 +170,7 @@
 	static inline size_t pthreadpool_decrement_fetch_relaxed_size_t(
 		pthreadpool_atomic_size_t* address)
 	{
-		return (size_t) _InterlockedDecrement64((__int64 volatile*) address);
+		return (size_t) _InterlockedDecrement64((volatile __int64*) address);
 	}
 
 	static inline bool pthreadpool_try_decrement_relaxed_size_t(
@@ -179,7 +181,7 @@
 			const size_t new_value = actual_value - 1;
 			const size_t expected_value = actual_value;
 			actual_value = _InterlockedCompareExchange64(
-				(__int64 volatile*) value, (__int64) new_value, (__int64) expected_value);
+				(volatile __int64*) value, (__int64) new_value, (__int64) expected_value);
 			if (actual_value == expected_value) {
 				return true;
 			}
@@ -259,7 +261,7 @@
 	static inline size_t pthreadpool_decrement_fetch_relaxed_size_t(
 		pthreadpool_atomic_size_t* address)
 	{
-		return (size_t) _InterlockedDecrement((long volatile*) address);
+		return (size_t) _InterlockedDecrement((volatile long*) address);
 	}
 
 	static inline bool pthreadpool_try_decrement_relaxed_size_t(
@@ -270,7 +272,7 @@
 			const size_t new_value = actual_value - 1;
 			const size_t expected_value = actual_value;
 			actual_value = _InterlockedCompareExchange(
-				(long volatile*) value, (long) new_value, (long) expected_value);
+				(volatile long*) value, (long) new_value, (long) expected_value);
 			if (actual_value == expected_value) {
 				return true;
 			}
@@ -285,7 +287,191 @@
 	static inline void pthreadpool_fence_release() {
 		_mm_sfence();
 	}
-#else
+#elif defined(_MSC_VER) && defined(_M_ARM64)
+	typedef volatile uint32_t pthreadpool_atomic_uint32_t;
+	typedef volatile size_t   pthreadpool_atomic_size_t;
+	typedef void *volatile    pthreadpool_atomic_void_p;
+
+	static inline uint32_t pthreadpool_load_relaxed_uint32_t(
+		pthreadpool_atomic_uint32_t* address)
+	{
+		return (uint32_t) __iso_volatile_load32((const volatile __int32*) address);
+	}
+
+	static inline size_t pthreadpool_load_relaxed_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		return (size_t) __iso_volatile_load64((const volatile __int64*) address);
+	}
+
+	static inline void* pthreadpool_load_relaxed_void_p(
+		pthreadpool_atomic_void_p* address)
+	{
+		return (void*) __iso_volatile_load64((const volatile __int64*) address);
+	}
+
+	static inline void pthreadpool_store_relaxed_uint32_t(
+		pthreadpool_atomic_uint32_t* address,
+		uint32_t value)
+	{
+		__iso_volatile_store32((volatile __int32*) address, (__int32) value);
+	}
+
+	static inline void pthreadpool_store_relaxed_size_t(
+		pthreadpool_atomic_size_t* address,
+		size_t value)
+	{
+		__iso_volatile_store64((volatile __int64*) address, (__int64) value);
+	}
+
+	static inline void pthreadpool_store_relaxed_void_p(
+		pthreadpool_atomic_void_p* address,
+		void* value)
+	{
+		__iso_volatile_store64((volatile __int64*) address, (__int64) value);
+	}
+
+	static inline void pthreadpool_store_release_uint32_t(
+		pthreadpool_atomic_uint32_t* address,
+		uint32_t value)
+	{
+		_WriteBarrier();
+		__stlr32((unsigned __int32 volatile*) address, (unsigned __int32) value);
+	}
+
+	static inline void pthreadpool_store_release_size_t(
+		pthreadpool_atomic_size_t* address,
+		size_t value)
+	{
+		_WriteBarrier();
+		__stlr64((unsigned __int64 volatile*) address, (unsigned __int64) value);
+	}
+
+	static inline size_t pthreadpool_decrement_fetch_relaxed_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		return (size_t) _InterlockedDecrement64_nf((volatile __int64*) address);
+	}
+
+	static inline bool pthreadpool_try_decrement_relaxed_size_t(
+		pthreadpool_atomic_size_t* value)
+	{
+		size_t actual_value = (size_t) __iso_volatile_load64((const volatile __int64*) value);
+		while (actual_value != 0) {
+			const size_t new_value = actual_value - 1;
+			const size_t expected_value = actual_value;
+			actual_value = _InterlockedCompareExchange64_nf(
+				(volatile __int64*) value, (__int64) new_value, (__int64) expected_value);
+			if (actual_value == expected_value) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	static inline void pthreadpool_fence_acquire() {
+		__dmb(_ARM64_BARRIER_ISHLD);
+		_ReadBarrier();
+	}
+
+	static inline void pthreadpool_fence_release() {
+		_WriteBarrier();
+		__dmb(_ARM64_BARRIER_ISH);
+	}
+#elif defined(_MSC_VER) && defined(_M_ARM)
+	typedef volatile uint32_t pthreadpool_atomic_uint32_t;
+	typedef volatile size_t   pthreadpool_atomic_size_t;
+	typedef void *volatile    pthreadpool_atomic_void_p;
+
+	static inline uint32_t pthreadpool_load_relaxed_uint32_t(
+		pthreadpool_atomic_uint32_t* address)
+	{
+		return (uint32_t) __iso_volatile_load32((const volatile __int32*) address);
+	}
+
+	static inline size_t pthreadpool_load_relaxed_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		return (size_t) __iso_volatile_load32((const volatile __int32*) address);
+	}
+
+	static inline void* pthreadpool_load_relaxed_void_p(
+		pthreadpool_atomic_void_p* address)
+	{
+		return (void*) __iso_volatile_load32((const volatile __int32*) address);
+	}
+
+	static inline void pthreadpool_store_relaxed_uint32_t(
+		pthreadpool_atomic_uint32_t* address,
+		uint32_t value)
+	{
+		__iso_volatile_store32((volatile __int32*) address, (__int32) value);
+	}
+
+	static inline void pthreadpool_store_relaxed_size_t(
+		pthreadpool_atomic_size_t* address,
+		size_t value)
+	{
+		__iso_volatile_store32((volatile __int32*) address, (__int32) value);
+	}
+
+	static inline void pthreadpool_store_relaxed_void_p(
+		pthreadpool_atomic_void_p* address,
+		void* value)
+	{
+		__iso_volatile_store32((volatile __int32*) address, (__int32) value);
+	}
+
+	static inline void pthreadpool_store_release_uint32_t(
+		pthreadpool_atomic_uint32_t* address,
+		uint32_t value)
+	{
+		_WriteBarrier();
+		__dmb(_ARM_BARRIER_ISH);
+		__iso_volatile_store32((volatile __int32*) address, (__int32) value);
+	}
+
+	static inline void pthreadpool_store_release_size_t(
+		pthreadpool_atomic_size_t* address,
+		size_t value)
+	{
+		_WriteBarrier();
+		__dmb(_ARM_BARRIER_ISH);
+		__iso_volatile_store32((volatile __int32*) address, (__int32) value);
+	}
+
+	static inline size_t pthreadpool_decrement_fetch_relaxed_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		return (size_t) _InterlockedDecrement_nf((volatile long*) address);
+	}
+
+	static inline bool pthreadpool_try_decrement_relaxed_size_t(
+		pthreadpool_atomic_size_t* value)
+	{
+		size_t actual_value = (size_t) __iso_volatile_load32((const volatile __int32*) value);
+		while (actual_value != 0) {
+			const size_t new_value = actual_value - 1;
+			const size_t expected_value = actual_value;
+			actual_value = _InterlockedCompareExchange_nf(
+				(volatile long*) value, (long) new_value, (long) expected_value);
+			if (actual_value == expected_value) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	static inline void pthreadpool_fence_acquire() {
+		__dmb(_ARM_BARRIER_ISH);
+		_ReadBarrier();
+	}
+
+	static inline void pthreadpool_fence_release() {
+		_WriteBarrier();
+		__dmb(_ARM_BARRIER_ISH);
+	}
+#elif defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L)
 	#include <stdatomic.h>
 
 	typedef _Atomic(uint32_t) pthreadpool_atomic_uint32_t;
@@ -384,4 +570,6 @@
 	static inline void pthreadpool_fence_release() {
 		atomic_thread_fence(memory_order_release);
 	}
+#else
+	#error "Platform-specific implementation of threadpool-atomics.h required"
 #endif

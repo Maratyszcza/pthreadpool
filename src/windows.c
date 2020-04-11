@@ -11,12 +11,6 @@
 /* Windows headers */
 #include <windows.h>
 
-/* MSVC-specific headers */
-#ifdef _MSC_VER
-	#include <intrin.h>
-	#include <immintrin.h>
-#endif
-
 /* Public library header */
 #include <pthreadpool.h>
 

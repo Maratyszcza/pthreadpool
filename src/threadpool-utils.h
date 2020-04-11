@@ -11,7 +11,9 @@
 /* MSVC-specific headers */
 #if defined(_MSC_VER) && _MSC_VER >= 1920
 	#include <intrin.h>
-	#include <immintrin.h>
+	#if defined(_M_IX86) || defined(_M_X64) || defined(_M_AMD64)
+		#include <immintrin.h>
+	#endif
 #endif
 
 
