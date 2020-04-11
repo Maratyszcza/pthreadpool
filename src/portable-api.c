@@ -50,7 +50,7 @@ static void thread_parallelize_1d(struct pthreadpool* threadpool, struct thread_
 	{
 		struct thread_info* other_thread = &threadpool->threads[tid];
 		while (pthreadpool_try_decrement_relaxed_size_t(&other_thread->range_length)) {
-			const size_t index = pthreadpool_fetch_sub_relaxed_size_t(&other_thread->range_end, 1) - 1;
+			const size_t index = pthreadpool_decrement_fetch_relaxed_size_t(&other_thread->range_end);
 			task(argument, index);
 		}
 	}
@@ -90,7 +90,7 @@ static void thread_parallelize_1d_with_uarch(struct pthreadpool* threadpool, str
 	{
 		struct thread_info* other_thread = &threadpool->threads[tid];
 		while (pthreadpool_try_decrement_relaxed_size_t(&other_thread->range_length)) {
-			const size_t index = pthreadpool_fetch_sub_relaxed_size_t(&other_thread->range_end, 1) - 1;
+			const size_t index = pthreadpool_decrement_fetch_relaxed_size_t(&other_thread->range_end);
 			task(argument, uarch_index, index);
 		}
 	}
@@ -126,7 +126,7 @@ static void thread_parallelize_1d_tile_1d(struct pthreadpool* threadpool, struct
 	{
 		struct thread_info* other_thread = &threadpool->threads[tid];
 		while (pthreadpool_try_decrement_relaxed_size_t(&other_thread->range_length)) {
-			const size_t tile_index = pthreadpool_fetch_sub_relaxed_size_t(&other_thread->range_end, 1) - 1;
+			const size_t tile_index = pthreadpool_decrement_fetch_relaxed_size_t(&other_thread->range_end);
 			const size_t tile_start = tile_index * tile;
 			task(argument, tile_start, min(range - tile_start, tile));
 		}
@@ -167,7 +167,7 @@ static void thread_parallelize_2d(struct pthreadpool* threadpool, struct thread_
 	{
 		struct thread_info* other_thread = &threadpool->threads[tid];
 		while (pthreadpool_try_decrement_relaxed_size_t(&other_thread->range_length)) {
-			const size_t linear_index = pthreadpool_fetch_sub_relaxed_size_t(&other_thread->range_end, 1) - 1;
+			const size_t linear_index = pthreadpool_decrement_fetch_relaxed_size_t(&other_thread->range_end);
 			const struct fxdiv_result_size_t index_i_j = fxdiv_divide_size_t(linear_index, range_j);
 			task(argument, index_i_j.quotient, index_i_j.remainder);
 		}
@@ -211,7 +211,7 @@ static void thread_parallelize_2d_tile_1d(struct pthreadpool* threadpool, struct
 	{
 		struct thread_info* other_thread = &threadpool->threads[tid];
 		while (pthreadpool_try_decrement_relaxed_size_t(&other_thread->range_length)) {
-			const size_t linear_index = pthreadpool_fetch_sub_relaxed_size_t(&other_thread->range_end, 1) - 1;
+			const size_t linear_index = pthreadpool_decrement_fetch_relaxed_size_t(&other_thread->range_end);
 			const struct fxdiv_result_size_t tile_index_i_j = fxdiv_divide_size_t(linear_index, tile_range_j);
 			const size_t start_j = tile_index_i_j.remainder * tile_j;
 			task(argument, tile_index_i_j.quotient, start_j, min(range_j - start_j, tile_j));
@@ -258,7 +258,7 @@ static void thread_parallelize_2d_tile_2d(struct pthreadpool* threadpool, struct
 	{
 		struct thread_info* other_thread = &threadpool->threads[tid];
 		while (pthreadpool_try_decrement_relaxed_size_t(&other_thread->range_length)) {
-			const size_t linear_index = pthreadpool_fetch_sub_relaxed_size_t(&other_thread->range_end, 1) - 1;
+			const size_t linear_index = pthreadpool_decrement_fetch_relaxed_size_t(&other_thread->range_end);
 			const struct fxdiv_result_size_t tile_index_i_j = fxdiv_divide_size_t(linear_index, tile_range_j);
 			const size_t start_i = tile_index_i_j.quotient * tile_i;
 			const size_t start_j = tile_index_i_j.remainder * tile_j;
@@ -315,7 +315,7 @@ static void thread_parallelize_2d_tile_2d_with_uarch(struct pthreadpool* threadp
 	{
 		struct thread_info* other_thread = &threadpool->threads[tid];
 		while (pthreadpool_try_decrement_relaxed_size_t(&other_thread->range_length)) {
-			const size_t linear_index = pthreadpool_fetch_sub_relaxed_size_t(&other_thread->range_end, 1) - 1;
+			const size_t linear_index = pthreadpool_decrement_fetch_relaxed_size_t(&other_thread->range_end);
 			const struct fxdiv_result_size_t tile_index_i_j = fxdiv_divide_size_t(linear_index, tile_range_j);
 			const size_t start_i = tile_index_i_j.quotient * tile_i;
 			const size_t start_j = tile_index_i_j.remainder * tile_j;
@@ -370,7 +370,7 @@ static void thread_parallelize_3d_tile_2d(struct pthreadpool* threadpool, struct
 	{
 		struct thread_info* other_thread = &threadpool->threads[tid];
 		while (pthreadpool_try_decrement_relaxed_size_t(&other_thread->range_length)) {
-			const size_t linear_index = pthreadpool_fetch_sub_relaxed_size_t(&other_thread->range_end, 1) - 1;
+			const size_t linear_index = pthreadpool_decrement_fetch_relaxed_size_t(&other_thread->range_end);
 			const struct fxdiv_result_size_t tile_index_ij_k = fxdiv_divide_size_t(linear_index, tile_range_k);
 			const struct fxdiv_result_size_t tile_index_i_j = fxdiv_divide_size_t(tile_index_ij_k.quotient, tile_range_j);
 			const size_t start_j = tile_index_i_j.remainder * tile_j;
@@ -435,7 +435,7 @@ static void thread_parallelize_3d_tile_2d_with_uarch(struct pthreadpool* threadp
 	{
 		struct thread_info* other_thread = &threadpool->threads[tid];
 		while (pthreadpool_try_decrement_relaxed_size_t(&other_thread->range_length)) {
-			const size_t linear_index = pthreadpool_fetch_sub_relaxed_size_t(&other_thread->range_end, 1) - 1;
+			const size_t linear_index = pthreadpool_decrement_fetch_relaxed_size_t(&other_thread->range_end);
 			const struct fxdiv_result_size_t tile_index_ij_k = fxdiv_divide_size_t(linear_index, tile_range_k);
 			const struct fxdiv_result_size_t tile_index_i_j = fxdiv_divide_size_t(tile_index_ij_k.quotient, tile_range_j);
 			const size_t start_j = tile_index_i_j.remainder * tile_j;
@@ -497,7 +497,7 @@ static void thread_parallelize_4d_tile_2d(struct pthreadpool* threadpool, struct
 	{
 		struct thread_info* other_thread = &threadpool->threads[tid];
 		while (pthreadpool_try_decrement_relaxed_size_t(&other_thread->range_length)) {
-			const size_t linear_index = pthreadpool_fetch_sub_relaxed_size_t(&other_thread->range_end, 1) - 1;
+			const size_t linear_index = pthreadpool_decrement_fetch_relaxed_size_t(&other_thread->range_end);
 			const struct fxdiv_result_size_t tile_index_ij_kl = fxdiv_divide_size_t(linear_index, tile_range_kl);
 			const struct fxdiv_result_size_t index_i_j = fxdiv_divide_size_t(tile_index_ij_kl.quotient, range_j);
 			const struct fxdiv_result_size_t tile_index_k_l = fxdiv_divide_size_t(tile_index_ij_kl.remainder, tile_range_l);
@@ -569,7 +569,7 @@ static void thread_parallelize_4d_tile_2d_with_uarch(struct pthreadpool* threadp
 	{
 		struct thread_info* other_thread = &threadpool->threads[tid];
 		while (pthreadpool_try_decrement_relaxed_size_t(&other_thread->range_length)) {
-			const size_t linear_index = pthreadpool_fetch_sub_relaxed_size_t(&other_thread->range_end, 1) - 1;
+			const size_t linear_index = pthreadpool_decrement_fetch_relaxed_size_t(&other_thread->range_end);
 			const struct fxdiv_result_size_t tile_index_ij_kl = fxdiv_divide_size_t(linear_index, tile_range_kl);
 			const struct fxdiv_result_size_t index_i_j = fxdiv_divide_size_t(tile_index_ij_kl.quotient, range_j);
 			const struct fxdiv_result_size_t tile_index_k_l = fxdiv_divide_size_t(tile_index_ij_kl.remainder, tile_range_l);
@@ -638,7 +638,7 @@ static void thread_parallelize_5d_tile_2d(struct pthreadpool* threadpool, struct
 	{
 		struct thread_info* other_thread = &threadpool->threads[tid];
 		while (pthreadpool_try_decrement_relaxed_size_t(&other_thread->range_length)) {
-			const size_t linear_index = pthreadpool_fetch_sub_relaxed_size_t(&other_thread->range_end, 1) - 1;
+			const size_t linear_index = pthreadpool_decrement_fetch_relaxed_size_t(&other_thread->range_end);
 			const struct fxdiv_result_size_t tile_index_ijk_lm = fxdiv_divide_size_t(linear_index, tile_range_lm);
 			const struct fxdiv_result_size_t index_ij_k = fxdiv_divide_size_t(tile_index_ijk_lm.quotient, range_k);
 			const struct fxdiv_result_size_t tile_index_l_m = fxdiv_divide_size_t(tile_index_ijk_lm.remainder, tile_range_m);
@@ -716,7 +716,7 @@ static void thread_parallelize_6d_tile_2d(struct pthreadpool* threadpool, struct
 	{
 		struct thread_info* other_thread = &threadpool->threads[tid];
 		while (pthreadpool_try_decrement_relaxed_size_t(&other_thread->range_length)) {
-			const size_t linear_index = pthreadpool_fetch_sub_relaxed_size_t(&other_thread->range_end, 1) - 1;
+			const size_t linear_index = pthreadpool_decrement_fetch_relaxed_size_t(&other_thread->range_end);
 			const struct fxdiv_result_size_t tile_index_ijkl_mn = fxdiv_divide_size_t(linear_index, tile_range_mn);
 			const struct fxdiv_result_size_t index_ij_kl = fxdiv_divide_size_t(tile_index_ijkl_mn.quotient, range_kl);
 			const struct fxdiv_result_size_t tile_index_m_n = fxdiv_divide_size_t(tile_index_ijkl_mn.remainder, tile_range_n);

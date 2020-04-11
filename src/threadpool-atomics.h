@@ -76,11 +76,10 @@
 		__c11_atomic_store(address, value, __ATOMIC_RELEASE);
 	}
 
-	static inline size_t pthreadpool_fetch_sub_relaxed_size_t(
-		pthreadpool_atomic_size_t* address,
-		size_t decrement)
+	static inline size_t pthreadpool_decrement_fetch_relaxed_size_t(
+		pthreadpool_atomic_size_t* address)
 	{
-		return __c11_atomic_fetch_sub(address, decrement, __ATOMIC_RELAXED);
+		return __c11_atomic_fetch_sub(address, 1, __ATOMIC_RELAXED) - 1;
 	}
 
 	static inline bool pthreadpool_try_decrement_relaxed_size_t(
@@ -166,11 +165,10 @@
 		*address = value;
 	}
 
-	static inline size_t pthreadpool_fetch_sub_relaxed_size_t(
-		pthreadpool_atomic_size_t* address,
-		size_t decrement)
+	static inline size_t pthreadpool_decrement_fetch_relaxed_size_t(
+		pthreadpool_atomic_size_t* address)
 	{
-		return (size_t) _InterlockedExchangeAdd64((__int64 volatile*) address, (__int64) -decrement);
+		return (size_t) _InterlockedDecrement64((__int64 volatile*) address);
 	}
 
 	static inline bool pthreadpool_try_decrement_relaxed_size_t(
@@ -258,11 +256,10 @@
 		*address = value;
 	}
 
-	static inline size_t pthreadpool_fetch_sub_relaxed_size_t(
-		pthreadpool_atomic_size_t* address,
-		size_t decrement)
+	static inline size_t pthreadpool_decrement_fetch_relaxed_size_t(
+		pthreadpool_atomic_size_t* address)
 	{
-		return (size_t) _InterlockedExchangeAdd((long volatile*) address, (long) -decrement);
+		return (size_t) _InterlockedDecrement((long volatile*) address);
 	}
 
 	static inline bool pthreadpool_try_decrement_relaxed_size_t(
@@ -348,11 +345,10 @@
 		atomic_store_explicit(address, value, memory_order_release);
 	}
 
-	static inline size_t pthreadpool_fetch_sub_relaxed_size_t(
-		pthreadpool_atomic_size_t* address,
-		size_t decrement)
+	static inline size_t pthreadpool_decrement_fetch_relaxed_size_t(
+		pthreadpool_atomic_size_t* address)
 	{
-		return atomic_fetch_sub_explicit(address, decrement, memory_order_relaxed);
+		return atomic_fetch_sub_explicit(address, 1, memory_order_relaxed) - 1;
 	}
 
 	static inline bool pthreadpool_try_decrement_relaxed_size_t(
