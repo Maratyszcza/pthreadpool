@@ -43,6 +43,18 @@
 		return __c11_atomic_load(address, __ATOMIC_RELAXED);
 	}
 
+	static inline uint32_t pthreadpool_load_acquire_uint32_t(
+		pthreadpool_atomic_uint32_t* address)
+	{
+		return __c11_atomic_load(address, __ATOMIC_ACQUIRE);
+	}
+
+	static inline size_t pthreadpool_load_acquire_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		return __c11_atomic_load(address, __ATOMIC_ACQUIRE);
+	}
+
 	static inline void pthreadpool_store_relaxed_uint32_t(
 		pthreadpool_atomic_uint32_t* address,
 		uint32_t value)
@@ -82,6 +94,12 @@
 		pthreadpool_atomic_size_t* address)
 	{
 		return __c11_atomic_fetch_sub(address, 1, __ATOMIC_RELAXED) - 1;
+	}
+
+	static inline size_t pthreadpool_decrement_fetch_release_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		return __c11_atomic_fetch_sub(address, 1, __ATOMIC_RELEASE) - 1;
 	}
 
 	static inline bool pthreadpool_try_decrement_relaxed_size_t(
@@ -128,6 +146,24 @@
 		return *address;
 	}
 
+	static inline uint32_t pthreadpool_load_acquire_uint32_t(
+		pthreadpool_atomic_uint32_t* address)
+	{
+		/* x86-64 loads always have acquire semantics; use only a compiler barrier */
+		const uint32_t value = *address;
+		_ReadBarrier();
+		return value;
+	}
+
+	static inline size_t pthreadpool_load_acquire_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		/* x86-64 loads always have acquire semantics; use only a compiler barrier */
+		const size_t value = *address;
+		_ReadBarrier();
+		return value;
+	}
+
 	static inline void pthreadpool_store_relaxed_uint32_t(
 		pthreadpool_atomic_uint32_t* address,
 		uint32_t value)
@@ -168,6 +204,12 @@
 	}
 
 	static inline size_t pthreadpool_decrement_fetch_relaxed_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		return (size_t) _InterlockedDecrement64((volatile __int64*) address);
+	}
+
+	static inline size_t pthreadpool_decrement_fetch_release_size_t(
 		pthreadpool_atomic_size_t* address)
 	{
 		return (size_t) _InterlockedDecrement64((volatile __int64*) address);
@@ -221,6 +263,24 @@
 		return *address;
 	}
 
+	static inline uint32_t pthreadpool_load_acquire_uint32_t(
+		pthreadpool_atomic_uint32_t* address)
+	{
+		/* x86 loads always have acquire semantics; use only a compiler barrier */
+		const uint32_t value = *address;
+		_ReadBarrier();
+		return value;
+	}
+
+	static inline size_t pthreadpool_load_acquire_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		/* x86 loads always have acquire semantics; use only a compiler barrier */
+		const size_t value = *address;
+		_ReadBarrier();
+		return value;
+	}
+
 	static inline void pthreadpool_store_relaxed_uint32_t(
 		pthreadpool_atomic_uint32_t* address,
 		uint32_t value)
@@ -246,7 +306,8 @@
 		pthreadpool_atomic_uint32_t* address,
 		uint32_t value)
 	{
-		/* x86 stores always have release semantics */
+		/* x86 stores always have release semantics; use only a compiler barrier */
+		_WriteBarrier();
 		*address = value;
 	}
 
@@ -254,11 +315,18 @@
 		pthreadpool_atomic_size_t* address,
 		size_t value)
 	{
-		/* x86 stores always have release semantics */
+		/* x86 stores always have release semantics; use only a compiler barrier */
+		_WriteBarrier();
 		*address = value;
 	}
 
 	static inline size_t pthreadpool_decrement_fetch_relaxed_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		return (size_t) _InterlockedDecrement((volatile long*) address);
+	}
+
+	static inline size_t pthreadpool_decrement_fetch_release_size_t(
 		pthreadpool_atomic_size_t* address)
 	{
 		return (size_t) _InterlockedDecrement((volatile long*) address);
@@ -310,6 +378,18 @@
 		return (void*) __iso_volatile_load64((const volatile __int64*) address);
 	}
 
+	static inline uint32_t pthreadpool_load_acquire_uint32_t(
+		pthreadpool_atomic_uint32_t* address)
+	{
+		return (uint32_t) __ldar32((volatile unsigned __int32*) address);
+	}
+
+	static inline size_t pthreadpool_load_acquire_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		return (size_t) __ldar64((volatile unsigned __int64*) address);
+	}
+
 	static inline void pthreadpool_store_relaxed_uint32_t(
 		pthreadpool_atomic_uint32_t* address,
 		uint32_t value)
@@ -351,6 +431,12 @@
 		pthreadpool_atomic_size_t* address)
 	{
 		return (size_t) _InterlockedDecrement64_nf((volatile __int64*) address);
+	}
+
+	static inline size_t pthreadpool_decrement_fetch_release_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		return (size_t) _InterlockedDecrement64_rel((volatile __int64*) address);
 	}
 
 	static inline bool pthreadpool_try_decrement_relaxed_size_t(
@@ -401,6 +487,24 @@
 		return (void*) __iso_volatile_load32((const volatile __int32*) address);
 	}
 
+	static inline uint32_t pthreadpool_load_acquire_uint32_t(
+		pthreadpool_atomic_uint32_t* address)
+	{
+		const uint32_t value = (uint32_t) __iso_volatile_load32((const volatile __int32*) address);
+		__dmb(_ARM_BARRIER_ISH);
+		_ReadBarrier();
+		return value;
+	}
+
+	static inline size_t pthreadpool_load_acquire_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		const size_t value = (size_t) __iso_volatile_load32((const volatile __int32*) address);
+		__dmb(_ARM_BARRIER_ISH);
+		_ReadBarrier();
+		return value;
+	}
+
 	static inline void pthreadpool_store_relaxed_uint32_t(
 		pthreadpool_atomic_uint32_t* address,
 		uint32_t value)
@@ -444,6 +548,12 @@
 		pthreadpool_atomic_size_t* address)
 	{
 		return (size_t) _InterlockedDecrement_nf((volatile long*) address);
+	}
+
+	static inline size_t pthreadpool_decrement_fetch_release_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		return (size_t) _InterlockedDecrement_rel((volatile long*) address);
 	}
 
 	static inline bool pthreadpool_try_decrement_relaxed_size_t(
@@ -496,6 +606,18 @@
 		return atomic_load_explicit(address, memory_order_relaxed);
 	}
 
+	static inline uint32_t pthreadpool_load_acquire_uint32_t(
+		pthreadpool_atomic_uint32_t* address)
+	{
+		return atomic_load_explicit(address, memory_order_acquire);
+	}
+
+	static inline size_t pthreadpool_load_acquire_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		return atomic_load_explicit(address, memory_order_acquire);
+	}
+
 	static inline void pthreadpool_store_relaxed_uint32_t(
 		pthreadpool_atomic_uint32_t* address,
 		uint32_t value)
@@ -535,6 +657,12 @@
 		pthreadpool_atomic_size_t* address)
 	{
 		return atomic_fetch_sub_explicit(address, 1, memory_order_relaxed) - 1;
+	}
+
+	static inline size_t pthreadpool_decrement_fetch_release_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		return atomic_fetch_sub_explicit(address, 1, memory_order_release) - 1;
 	}
 
 	static inline bool pthreadpool_try_decrement_relaxed_size_t(

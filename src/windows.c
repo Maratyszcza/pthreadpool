@@ -21,14 +21,14 @@
 
 
 static void checkin_worker_thread(struct pthreadpool* threadpool, uint32_t event_index) {
-	if (pthreadpool_decrement_fetch_relaxed_size_t(&threadpool->active_threads) == 0) {
+	if (pthreadpool_decrement_fetch_release_size_t(&threadpool->active_threads) == 0) {
 		SetEvent(threadpool->completion_event[event_index]);
 	}
 }
 
 static void wait_worker_threads(struct pthreadpool* threadpool, uint32_t event_index) {
 	/* Initial check */
-	size_t active_threads = pthreadpool_load_relaxed_size_t(&threadpool->active_threads);
+	size_t active_threads = pthreadpool_load_acquire_size_t(&threadpool->active_threads);
 	if (active_threads == 0) {
 		return;
 	}
@@ -38,7 +38,7 @@ static void wait_worker_threads(struct pthreadpool* threadpool, uint32_t event_i
 		/* This fence serves as a sleep instruction */
 		pthreadpool_fence_acquire();
 
-		active_threads = pthreadpool_load_relaxed_size_t(&threadpool->active_threads);
+		active_threads = pthreadpool_load_acquire_size_t(&threadpool->active_threads);
 		if (active_threads == 0) {
 			return;
 		}
@@ -55,7 +55,7 @@ static uint32_t wait_for_new_command(
 	uint32_t last_command,
 	uint32_t last_flags)
 {
-	uint32_t command = pthreadpool_load_relaxed_uint32_t(&threadpool->command);
+	uint32_t command = pthreadpool_load_acquire_uint32_t(&threadpool->command);
 	if (command != last_command) {
 		return command;
 	}
@@ -66,7 +66,7 @@ static uint32_t wait_for_new_command(
 			/* This fence serves as a sleep instruction */
 			pthreadpool_fence_acquire();
 
-			command = pthreadpool_load_relaxed_uint32_t(&threadpool->command);
+			command = pthreadpool_load_acquire_uint32_t(&threadpool->command);
 			if (command != last_command) {
 				return command;
 			}
@@ -170,7 +170,7 @@ struct pthreadpool* pthreadpool_create(size_t threads_count) {
 				NULL /* name */);
 		}
 
-		pthreadpool_store_release_size_t(&threadpool->active_threads, threads_count - 1 /* caller thread */);
+		pthreadpool_store_relaxed_size_t(&threadpool->active_threads, threads_count - 1 /* caller thread */);
 
 		/* Caller thread serves as worker #0. Thus, we create system threads starting with worker #1. */
 		for (size_t tid = 1; tid < threads_count; tid++) {
