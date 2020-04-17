@@ -23,7 +23,7 @@
 #endif
 
 #ifndef PTHREADPOOL_USE_EVENT
-	#if defined(_WIN32)
+	#if defined(_WIN32) || defined(__CYGWIN__)
 		#define PTHREADPOOL_USE_EVENT 1
 	#else
 		#define PTHREADPOOL_USE_EVENT 0
