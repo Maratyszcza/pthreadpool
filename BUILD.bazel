@@ -34,6 +34,10 @@ PORTABLE_SRCS = [
     "src/portable-api.c",
 ]
 
+ARCH_SPECIFIC_SRCS = [
+    "src/fastpath.c",
+]
+
 PTHREADS_IMPL_SRCS = PORTABLE_SRCS + ["src/pthreads.c"]
 
 GCD_IMPL_SRCS = PORTABLE_SRCS + ["src/gcd.c"]
@@ -54,9 +58,23 @@ cc_library(
         ":macos_x86": INTERNAL_HDRS + GCD_IMPL_SRCS,
         ":macos_x86_64": INTERNAL_HDRS + GCD_IMPL_SRCS,
         ":ios": INTERNAL_HDRS + GCD_IMPL_SRCS,
+        ":watchos": INTERNAL_HDRS + GCD_IMPL_SRCS,
+        ":tvos": INTERNAL_HDRS + GCD_IMPL_SRCS,
         ":windows_x86_64": INTERNAL_HDRS + WINDOWS_IMPL_SRCS,
-        ":windows_x86_64_msvc": INTERNAL_HDRS + WINDOWS_IMPL_SRCS,
         "//conditions:default": INTERNAL_HDRS + PTHREADS_IMPL_SRCS,
+    }) + select({
+        ":linux_x86_64": ARCH_SPECIFIC_SRCS,
+        ":android_x86": ARCH_SPECIFIC_SRCS,
+        ":android_x86_64": ARCH_SPECIFIC_SRCS,
+        ":windows_x86_64": ARCH_SPECIFIC_SRCS,
+        ":macos_x86": ARCH_SPECIFIC_SRCS,
+        ":macos_x86_64": ARCH_SPECIFIC_SRCS,
+        ":ios_x86": ARCH_SPECIFIC_SRCS,
+        ":ios_x86_64": ARCH_SPECIFIC_SRCS,
+        ":watchos_x86": ARCH_SPECIFIC_SRCS,
+        ":watchos_x86_64": ARCH_SPECIFIC_SRCS,
+        ":tvos_x86_64": ARCH_SPECIFIC_SRCS,
+        "//conditions:default": [],
     }),
     copts = [
         "-std=gnu11",
@@ -96,6 +114,19 @@ cc_library(
             "-DPTHREADPOOL_USE_EVENT=1",
         ],
         "//conditions:default": [],
+    }) + select({
+        ":linux_x86_64": ["-DPTHREADPOOL_USE_FASTPATH=1"],
+        ":android_x86": ["-DPTHREADPOOL_USE_FASTPATH=1"],
+        ":android_x86_64": ["-DPTHREADPOOL_USE_FASTPATH=1"],
+        ":windows_x86_64": ["-DPTHREADPOOL_USE_FASTPATH=1"],
+        ":macos_x86": ["-DPTHREADPOOL_USE_FASTPATH=1"],
+        ":macos_x86_64": ["-DPTHREADPOOL_USE_FASTPATH=1"],
+        ":ios_x86": ["-DPTHREADPOOL_USE_FASTPATH=1"],
+        ":ios_x86_64": ["-DPTHREADPOOL_USE_FASTPATH=1"],
+        ":watchos_x86": ["-DPTHREADPOOL_USE_FASTPATH=1"],
+        ":watchos_x86_64": ["-DPTHREADPOOL_USE_FASTPATH=1"],
+        ":tvos_x86_64": ["-DPTHREADPOOL_USE_FASTPATH=1"],
+        "//conditions:default": ["-DPTHREADPOOL_USE_FASTPATH=0"],
     }),
     hdrs = [
         "include/pthreadpool.h",
@@ -220,6 +251,11 @@ config_setting(
 )
 
 config_setting(
+    name = "linux_x86_64",
+    values = {"cpu": "k8"},
+)
+
+config_setting(
     name = "linux_arm",
     values = {"cpu": "arm"},
 )
@@ -232,6 +268,22 @@ config_setting(
 config_setting(
     name = "linux_aarch64",
     values = {"cpu": "aarch64"},
+)
+
+config_setting(
+    name = "android_x86",
+    values = {
+        "crosstool_top": "//external:android/crosstool",
+        "cpu": "x86",
+    },
+)
+
+config_setting(
+    name = "android_x86_64",
+    values = {
+        "crosstool_top": "//external:android/crosstool",
+        "cpu": "x86_64",
+    },
 )
 
 config_setting(
@@ -278,16 +330,65 @@ config_setting(
 )
 
 config_setting(
-    name = "windows_x86_64",
+    name = "ios_x86",
     values = {
-        "cpu": "x64_windows",
+        "apple_platform_type": "ios",
+        "cpu": "ios_i386",
     },
 )
 
 config_setting(
-    name = "windows_x86_64_msvc",
+    name = "ios_x86_64",
     values = {
-        "cpu": "x64_windows_msvc",
+        "apple_platform_type": "ios",
+        "cpu": "ios_x86_64",
+    },
+)
+
+config_setting(
+    name = "watchos",
+    values = {
+        "crosstool_top": "@bazel_tools//tools/cpp:toolchain",
+        "apple_platform_type": "watchos",
+    },
+)
+
+config_setting(
+    name = "watchos_x86",
+    values = {
+        "apple_platform_type": "watchos",
+        "cpu": "watchos_i386",
+    },
+)
+
+config_setting(
+    name = "watchos_x86_64",
+    values = {
+        "apple_platform_type": "watchos",
+        "cpu": "watchos_x86_64",
+    },
+)
+
+config_setting(
+    name = "tvos",
+    values = {
+        "crosstool_top": "@bazel_tools//tools/cpp:toolchain",
+        "apple_platform_type": "tvos",
+    },
+)
+
+config_setting(
+    name = "tvos_x86_64",
+    values = {
+        "apple_platform_type": "tvos",
+        "cpu": "tvos_x86_64",
+    },
+)
+
+config_setting(
+    name = "windows_x86_64",
+    values = {
+        "cpu": "x64_windows",
     },
 )
 

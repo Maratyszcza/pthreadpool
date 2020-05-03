@@ -526,3 +526,55 @@ PTHREADPOOL_INTERNAL void pthreadpool_parallelize(
 	void* context,
 	size_t linear_range,
 	uint32_t flags);
+
+PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_1d_fastpath(
+	struct pthreadpool* threadpool,
+	struct thread_info* thread);
+
+PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_1d_with_uarch_fastpath(
+	struct pthreadpool* threadpool,
+	struct thread_info* thread);
+
+PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_1d_tile_1d_fastpath(
+	struct pthreadpool* threadpool,
+	struct thread_info* thread);
+
+PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_2d_fastpath(
+	struct pthreadpool* threadpool,
+	struct thread_info* thread);
+
+PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_2d_tile_1d_fastpath(
+	struct pthreadpool* threadpool,
+	struct thread_info* thread);
+
+PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_2d_tile_2d_fastpath(
+	struct pthreadpool* threadpool,
+	struct thread_info* thread);
+
+PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_2d_tile_2d_with_uarch_fastpath(
+	struct pthreadpool* threadpool,
+	struct thread_info* thread);
+
+PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_3d_tile_2d_fastpath(
+	struct pthreadpool* threadpool,
+	struct thread_info* thread);
+
+PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_3d_tile_2d_with_uarch_fastpath(
+	struct pthreadpool* threadpool,
+	struct thread_info* thread);
+
+PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_4d_tile_2d_fastpath(
+	struct pthreadpool* threadpool,
+	struct thread_info* thread);
+
+PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_4d_tile_2d_with_uarch_fastpath(
+	struct pthreadpool* threadpool,
+	struct thread_info* thread);
+
+PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_5d_tile_2d_fastpath(
+	struct pthreadpool* threadpool,
+	struct thread_info* thread);
+
+PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_6d_tile_2d_fastpath(
+	struct pthreadpool* threadpool,
+	struct thread_info* thread);
