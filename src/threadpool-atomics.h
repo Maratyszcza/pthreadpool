@@ -13,7 +13,7 @@
 #endif
 
 
-#if defined(__wasm__) && defined(__EMSCRIPTEN_PTHREADS__) && defined(__clang__)
+#if defined(__wasm__) && defined(__clang__)
 	/*
 	 * Clang for WebAssembly target lacks stdatomic.h header,
 	 * even though it supports the necessary low-level intrinsics.
