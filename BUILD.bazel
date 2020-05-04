@@ -16,24 +16,6 @@ PORTABLE_SRCS = [
     "src/portable-api.c",
 ]
 
-PTHREADS_IMPL_SRCS = PORTABLE_SRCS + ["src/pthreads.c"]
-
-GCD_IMPL_SRCS = PORTABLE_SRCS + ["src/gcd.c"]
-
-SHIM_IMPL_SRCS = ["src/shim.c"]
-
-INTERNAL_HDRS = [
-    "src/threadpool-atomics.h",
-    "src/threadpool-common.h",
-    "src/threadpool-object.h",
-    "src/threadpool-utils.h",
-]
-
-PORTABLE_SRCS = [
-    "src/memory.c",
-    "src/portable-api.c",
-]
-
 ARCH_SPECIFIC_SRCS = [
     "src/fastpath.c",
 ]
@@ -54,7 +36,7 @@ cc_library(
         ":pthreadpool_sync_primitive_explicit_gcd": INTERNAL_HDRS + GCD_IMPL_SRCS,
         ":pthreadpool_sync_primitive_explicit_event": INTERNAL_HDRS + WINDOWS_IMPL_SRCS,
         ":emscripten_with_threads": INTERNAL_HDRS + PTHREADS_IMPL_SRCS,
-        ":emscripten": SHIM_IMPL_SRCS,
+        ":emscripten": INTERNAL_HDRS + SHIM_IMPL_SRCS,
         ":macos_x86": INTERNAL_HDRS + GCD_IMPL_SRCS,
         ":macos_x86_64": INTERNAL_HDRS + GCD_IMPL_SRCS,
         ":ios": INTERNAL_HDRS + GCD_IMPL_SRCS,
