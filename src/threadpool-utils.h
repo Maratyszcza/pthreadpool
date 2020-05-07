@@ -55,12 +55,21 @@ static inline void disable_fpu_denormals() {
 #if defined(__SSE__) || defined(__x86_64__) || defined(_M_X64) || defined(_M_AMD64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 1)
 	_mm_setcsr(_mm_getcsr() | 0x8040);
 #elif defined(__arm__) && defined(__ARM_FP) && (__ARM_FP != 0)
-	uint32_t fpscr;
-	__asm__ __volatile__(
-			"VMRS %[fpscr], fpscr\n"
-			"ORR %[fpscr], #0x1000000\n"
-			"VMSR fpscr, %[fpscr]\n"
-		: [fpscr] "=r" (fpscr));
+	#if defined(__thumb__) && !defined(__thumb2__)
+		__asm__ __volatile__(
+				"VMRS %[fpscr], fpscr\n"
+				"ORRS %[fpscr], %[bitmask]\n"
+				"VMSR fpscr, %[fpscr]\n"
+			: [fpscr] "=l" (fpscr)
+			: [bitmask] "l" (0x1000000)
+			: "cc");
+	#else
+		__asm__ __volatile__(
+				"VMRS %[fpscr], fpscr\n"
+				"ORR %[fpscr], #0x1000000\n"
+				"VMSR fpscr, %[fpscr]\n"
+			: [fpscr] "=r" (fpscr));
+	#endif
 #elif defined(__aarch64__)
 	uint64_t fpcr;
 	__asm__ __volatile__(
