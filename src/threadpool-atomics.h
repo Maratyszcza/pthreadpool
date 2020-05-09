@@ -130,123 +130,6 @@
 	static inline void pthreadpool_fence_release() {
 		__c11_atomic_thread_fence(__ATOMIC_RELEASE);
 	}
-#elif defined(_MSC_VER) && defined(_M_X64)
-	typedef volatile uint32_t pthreadpool_atomic_uint32_t;
-	typedef volatile size_t   pthreadpool_atomic_size_t;
-	typedef void *volatile    pthreadpool_atomic_void_p;
-
-	static inline uint32_t pthreadpool_load_relaxed_uint32_t(
-		pthreadpool_atomic_uint32_t* address)
-	{
-		return *address;
-	}
-
-	static inline size_t pthreadpool_load_relaxed_size_t(
-		pthreadpool_atomic_size_t* address)
-	{
-		return *address;
-	}
-
-	static inline void* pthreadpool_load_relaxed_void_p(
-		pthreadpool_atomic_void_p* address)
-	{
-		return *address;
-	}
-
-	static inline uint32_t pthreadpool_load_acquire_uint32_t(
-		pthreadpool_atomic_uint32_t* address)
-	{
-		/* x86-64 loads always have acquire semantics; use only a compiler barrier */
-		const uint32_t value = *address;
-		_ReadBarrier();
-		return value;
-	}
-
-	static inline size_t pthreadpool_load_acquire_size_t(
-		pthreadpool_atomic_size_t* address)
-	{
-		/* x86-64 loads always have acquire semantics; use only a compiler barrier */
-		const size_t value = *address;
-		_ReadBarrier();
-		return value;
-	}
-
-	static inline void pthreadpool_store_relaxed_uint32_t(
-		pthreadpool_atomic_uint32_t* address,
-		uint32_t value)
-	{
-		*address = value;
-	}
-
-	static inline void pthreadpool_store_relaxed_size_t(
-		pthreadpool_atomic_size_t* address,
-		size_t value)
-	{
-		*address = value;
-	}
-
-	static inline void pthreadpool_store_relaxed_void_p(
-		pthreadpool_atomic_void_p* address,
-		void* value)
-	{
-		*address = value;
-	}
-
-	static inline void pthreadpool_store_release_uint32_t(
-		pthreadpool_atomic_uint32_t* address,
-		uint32_t value)
-	{
-		/* x86-64 stores always have release semantics; use only a compiler barrier */
-		_WriteBarrier();
-		*address = value;
-	}
-
-	static inline void pthreadpool_store_release_size_t(
-		pthreadpool_atomic_size_t* address,
-		size_t value)
-	{
-		/* x86-64 stores always have release semantics; use only a compiler barrier */
-		_WriteBarrier();
-		*address = value;
-	}
-
-	static inline size_t pthreadpool_decrement_fetch_relaxed_size_t(
-		pthreadpool_atomic_size_t* address)
-	{
-		return (size_t) _InterlockedDecrement64((volatile __int64*) address);
-	}
-
-	static inline size_t pthreadpool_decrement_fetch_release_size_t(
-		pthreadpool_atomic_size_t* address)
-	{
-		return (size_t) _InterlockedDecrement64((volatile __int64*) address);
-	}
-
-	static inline bool pthreadpool_try_decrement_relaxed_size_t(
-		pthreadpool_atomic_size_t* value)
-	{
-		size_t actual_value = *value;
-		while (actual_value != 0) {
-			const size_t new_value = actual_value - 1;
-			const size_t expected_value = actual_value;
-			actual_value = _InterlockedCompareExchange64(
-				(volatile __int64*) value, (__int64) new_value, (__int64) expected_value);
-			if (actual_value == expected_value) {
-				return true;
-			}
-		}
-		return false;
-	}
-
-	static inline void pthreadpool_fence_acquire() {
-		_mm_lfence();
-		_ReadBarrier();
-	}
-
-	static inline void pthreadpool_fence_release() {
-		_WriteBarrier();
-		_mm_sfence();
-	}
 #elif defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L)
 	#include <stdatomic.h>
 
@@ -363,6 +246,123 @@
 
 	static inline void pthreadpool_fence_release() {
 		atomic_thread_fence(memory_order_release);
+	}
+#elif defined(_MSC_VER) && defined(_M_X64)
+	typedef volatile uint32_t pthreadpool_atomic_uint32_t;
+	typedef volatile size_t   pthreadpool_atomic_size_t;
+	typedef void *volatile    pthreadpool_atomic_void_p;
+
+	static inline uint32_t pthreadpool_load_relaxed_uint32_t(
+		pthreadpool_atomic_uint32_t* address)
+	{
+		return *address;
+	}
+
+	static inline size_t pthreadpool_load_relaxed_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		return *address;
+	}
+
+	static inline void* pthreadpool_load_relaxed_void_p(
+		pthreadpool_atomic_void_p* address)
+	{
+		return *address;
+	}
+
+	static inline uint32_t pthreadpool_load_acquire_uint32_t(
+		pthreadpool_atomic_uint32_t* address)
+	{
+		/* x86-64 loads always have acquire semantics; use only a compiler barrier */
+		const uint32_t value = *address;
+		_ReadBarrier();
+		return value;
+	}
+
+	static inline size_t pthreadpool_load_acquire_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		/* x86-64 loads always have acquire semantics; use only a compiler barrier */
+		const size_t value = *address;
+		_ReadBarrier();
+		return value;
+	}
+
+	static inline void pthreadpool_store_relaxed_uint32_t(
+		pthreadpool_atomic_uint32_t* address,
+		uint32_t value)
+	{
+		*address = value;
+	}
+
+	static inline void pthreadpool_store_relaxed_size_t(
+		pthreadpool_atomic_size_t* address,
+		size_t value)
+	{
+		*address = value;
+	}
+
+	static inline void pthreadpool_store_relaxed_void_p(
+		pthreadpool_atomic_void_p* address,
+		void* value)
+	{
+		*address = value;
+	}
+
+	static inline void pthreadpool_store_release_uint32_t(
+		pthreadpool_atomic_uint32_t* address,
+		uint32_t value)
+	{
+		/* x86-64 stores always have release semantics; use only a compiler barrier */
+		_WriteBarrier();
+		*address = value;
+	}
+
+	static inline void pthreadpool_store_release_size_t(
+		pthreadpool_atomic_size_t* address,
+		size_t value)
+	{
+		/* x86-64 stores always have release semantics; use only a compiler barrier */
+		_WriteBarrier();
+		*address = value;
+	}
+
+	static inline size_t pthreadpool_decrement_fetch_relaxed_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		return (size_t) _InterlockedDecrement64((volatile __int64*) address);
+	}
+
+	static inline size_t pthreadpool_decrement_fetch_release_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		return (size_t) _InterlockedDecrement64((volatile __int64*) address);
+	}
+
+	static inline bool pthreadpool_try_decrement_relaxed_size_t(
+		pthreadpool_atomic_size_t* value)
+	{
+		size_t actual_value = *value;
+		while (actual_value != 0) {
+			const size_t new_value = actual_value - 1;
+			const size_t expected_value = actual_value;
+			actual_value = _InterlockedCompareExchange64(
+				(volatile __int64*) value, (__int64) new_value, (__int64) expected_value);
+			if (actual_value == expected_value) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	static inline void pthreadpool_fence_acquire() {
+		_mm_lfence();
+		_ReadBarrier();
+	}
+
+	static inline void pthreadpool_fence_release() {
+		_WriteBarrier();
+		_mm_sfence();
 	}
 #elif defined(_MSC_VER) && defined(_M_IX86)
 	typedef volatile uint32_t pthreadpool_atomic_uint32_t;
