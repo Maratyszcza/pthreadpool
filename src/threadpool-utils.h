@@ -4,21 +4,18 @@
 #include <stddef.h>
 
 /* SSE-specific headers */
-#if defined(__SSE__) || defined(__x86_64__) || defined(_M_X64) || defined(_M_AMD64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 1)
+#if defined(__SSE__) || defined(__x86_64__) || defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 1)
 	#include <xmmintrin.h>
 #endif
 
 /* MSVC-specific headers */
 #if defined(_MSC_VER)
 	#include <intrin.h>
-	#if defined(_M_IX86) || defined(_M_X64) || defined(_M_AMD64)
-		#include <immintrin.h>
-	#endif
 #endif
 
 
 struct fpu_state {
-#if defined(__SSE__) || defined(__x86_64__) || defined(_M_X64) || defined(_M_AMD64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 1)
+#if defined(__SSE__) || defined(__x86_64__) || defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 1)
 	uint32_t mxcsr;
 #elif defined(__GNUC__) && defined(__arm__) && defined(__ARM_FP) && (__ARM_FP != 0) || defined(_MSC_VER) && defined(_M_ARM)
 	uint32_t fpscr;
@@ -31,7 +28,7 @@ struct fpu_state {
 
 static inline struct fpu_state get_fpu_state() {
 	struct fpu_state state = { 0 };
-#if defined(__SSE__) || defined(__x86_64__) || defined(_M_X64) || defined(_M_AMD64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 1)
+#if defined(__SSE__) || defined(__x86_64__) || defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 1)
 	state.mxcsr = (uint32_t) _mm_getcsr();
 #elif defined(_MSC_VER) && defined(_M_ARM)
 	state.fpscr = (uint32_t) _MoveFromCoprocessor(10, 7, 1, 0, 0);
@@ -46,7 +43,7 @@ static inline struct fpu_state get_fpu_state() {
 }
 
 static inline void set_fpu_state(const struct fpu_state state) {
-#if defined(__SSE__) || defined(__x86_64__) || defined(_M_X64) || defined(_M_AMD64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 1)
+#if defined(__SSE__) || defined(__x86_64__) || defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 1)
 	_mm_setcsr((unsigned int) state.mxcsr);
 #elif defined(_MSC_VER) && defined(_M_ARM)
 	_MoveToCoprocessor((int) state.fpscr, 10, 7, 1, 0, 0);
@@ -60,7 +57,7 @@ static inline void set_fpu_state(const struct fpu_state state) {
 }
 
 static inline void disable_fpu_denormals() {
-#if defined(__SSE__) || defined(__x86_64__) || defined(_M_X64) || defined(_M_AMD64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 1)
+#if defined(__SSE__) || defined(__x86_64__) || defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 1)
 	_mm_setcsr(_mm_getcsr() | 0x8040);
 #elif defined(_MSC_VER) && defined(_M_ARM)
 	int fpscr = _MoveFromCoprocessor(10, 7, 1, 0, 0);

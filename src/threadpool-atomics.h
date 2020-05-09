@@ -4,12 +4,19 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/* SSE-specific headers */
+#if defined(__i386__) || defined(__i686__) || defined(__x86_64__) || defined(_M_IX86) || defined(_M_X64)
+	#include <xmmintrin.h>
+#endif
+
+/* ARM-specific headers */
+#if defined(__ARM_ACLE)
+	#include <arm_acle.h>
+#endif
+
 /* MSVC-specific headers */
 #ifdef _MSC_VER
 	#include <intrin.h>
-	#if defined(_M_IX86) || defined(_M_X64) || defined(_M_AMD64)
-		#include <immintrin.h>
-	#endif
 #endif
 
 
@@ -123,7 +130,7 @@
 	static inline void pthreadpool_fence_release() {
 		__c11_atomic_thread_fence(__ATOMIC_RELEASE);
 	}
-#elif defined(_MSC_VER) && (defined(_M_X64) || defined(_M_AMD64))
+#elif defined(_MSC_VER) && defined(_M_X64)
 	typedef volatile uint32_t pthreadpool_atomic_uint32_t;
 	typedef volatile size_t   pthreadpool_atomic_size_t;
 	typedef void *volatile    pthreadpool_atomic_void_p;
@@ -700,4 +707,22 @@
 	}
 #else
 	#error "Platform-specific implementation of threadpool-atomics.h required"
+#endif
+
+#if defined(__i386__) || defined(__i686__) || defined(__x86_64__) || defined(_M_IX86) || defined(_M_X64)
+	static inline void pthreadpool_yield() {
+		_mm_pause();
+	}
+#elif defined(__ARM_ACLE) || defined(_MSC_VER) && (defined(_M_ARM) || defined(_M_ARM64))
+	static inline void pthreadpool_yield() {
+		__yield();
+	}
+#elif defined(__GNUC__) && (defined(__arm__) || defined(__aarch64__))
+	static inline void pthreadpool_yield() {
+		__asm__ __volatile__("yield");
+	}
+#else
+	static inline void pthreadpool_yield() {
+		pthreadpool_fence_acquire();
+	}
 #endif

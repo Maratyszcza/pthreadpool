@@ -108,8 +108,7 @@ static void wait_worker_threads(struct pthreadpool* threadpool) {
 
 	/* Spin-wait */
 	for (uint32_t i = PTHREADPOOL_SPIN_WAIT_ITERATIONS; i != 0; i--) {
-		/* This fence serves as a sleep instruction */
-		pthreadpool_fence_acquire();
+		pthreadpool_yield();
 
 		#if PTHREADPOOL_USE_FUTEX
 			has_active_threads = pthreadpool_load_acquire_uint32_t(&threadpool->has_active_threads);
@@ -151,8 +150,7 @@ static uint32_t wait_for_new_command(
 	if ((last_flags & PTHREADPOOL_FLAG_YIELD_WORKERS) == 0) {
 		/* Spin-wait loop */
 		for (uint32_t i = PTHREADPOOL_SPIN_WAIT_ITERATIONS; i != 0; i--) {
-			/* This fence serves as a sleep instruction */
-			pthreadpool_fence_acquire();
+			pthreadpool_yield();
 
 			command = pthreadpool_load_acquire_uint32_t(&threadpool->command);
 			if (command != last_command) {
