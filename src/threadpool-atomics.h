@@ -717,7 +717,7 @@
 	static inline void pthreadpool_yield() {
 		__yield();
 	}
-#elif defined(__GNUC__) && (defined(__arm__) || defined(__aarch64__))
+#elif defined(__GNUC__) && (defined(__ARM_ARCH) && (__ARM_ARCH >= 7) || (defined(__ARM_ARCH_6K__) || defined(__ARM_ARCH_6KZ__)) && !defined(__thumb__))
 	static inline void pthreadpool_yield() {
 		__asm__ __volatile__("yield");
 	}
