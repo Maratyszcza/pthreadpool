@@ -11,8 +11,14 @@ typedef void (*pthreadpool_task_1d_tile_1d_t)(void*, size_t, size_t);
 typedef void (*pthreadpool_task_2d_t)(void*, size_t, size_t);
 typedef void (*pthreadpool_task_2d_tile_1d_t)(void*, size_t, size_t, size_t);
 typedef void (*pthreadpool_task_2d_tile_2d_t)(void*, size_t, size_t, size_t, size_t);
+typedef void (*pthreadpool_task_3d_t)(void*, size_t, size_t, size_t);
+typedef void (*pthreadpool_task_3d_tile_1d_t)(void*, size_t, size_t, size_t, size_t);
 typedef void (*pthreadpool_task_3d_tile_2d_t)(void*, size_t, size_t, size_t, size_t, size_t);
+typedef void (*pthreadpool_task_4d_t)(void*, size_t, size_t, size_t, size_t);
+typedef void (*pthreadpool_task_4d_tile_1d_t)(void*, size_t, size_t, size_t, size_t, size_t);
 typedef void (*pthreadpool_task_4d_tile_2d_t)(void*, size_t, size_t, size_t, size_t, size_t, size_t);
+typedef void (*pthreadpool_task_5d_t)(void*, size_t, size_t, size_t, size_t, size_t);
+typedef void (*pthreadpool_task_5d_tile_1d_t)(void*, size_t, size_t, size_t, size_t, size_t, size_t);
 typedef void (*pthreadpool_task_5d_tile_2d_t)(void*, size_t, size_t, size_t, size_t, size_t, size_t, size_t);
 typedef void (*pthreadpool_task_6d_tile_2d_t)(void*, size_t, size_t, size_t, size_t, size_t, size_t, size_t, size_t);
 
@@ -360,6 +366,86 @@ void pthreadpool_parallelize_2d_tile_2d_with_uarch(
 	uint32_t flags);
 
 /**
+ * Process items on a 3D grid.
+ *
+ * The function implements a parallel version of the following snippet:
+ *
+ *   for (size_t i = 0; i < range_i; i++)
+ *     for (size_t j = 0; j < range_j; j++)
+ *       for (size_t k = 0; k < range_k; k++)
+ *         function(context, i, j, k);
+ *
+ * When the function returns, all items have been processed and the thread pool
+ * is ready for a new task.
+ *
+ * @note If multiple threads call this function with the same thread pool, the
+ *    calls are serialized.
+ *
+ * @param threadpool  the thread pool to use for parallelisation. If threadpool
+ *    is NULL, all items are processed serially on the calling thread.
+ * @param function    the function to call for each tile.
+ * @param context     the first argument passed to the specified function.
+ * @param range_i     the number of items to process along the first dimension
+ *    of the 3D grid.
+ * @param range_j     the number of items to process along the second dimension
+ *    of the 3D grid.
+ * @param range_k     the number of items to process along the third dimension
+ *    of the 3D grid.
+ * @param flags       a bitwise combination of zero or more optional flags
+ *    (PTHREADPOOL_FLAG_DISABLE_DENORMALS or PTHREADPOOL_FLAG_YIELD_WORKERS)
+ */
+void pthreadpool_parallelize_3d(
+	pthreadpool_t threadpool,
+	pthreadpool_task_3d_t function,
+	void* context,
+	size_t range_i,
+	size_t range_j,
+	size_t range_k,
+	uint32_t flags);
+
+/**
+ * Process items on a 3D grid with the specified maximum tile size along the
+ * last grid dimension.
+ *
+ * The function implements a parallel version of the following snippet:
+ *
+ *   for (size_t i = 0; i < range_i; i++)
+ *     for (size_t j = 0; j < range_j; j++)
+ *       for (size_t k = 0; k < range_k; k += tile_k)
+ *         function(context, i, j, k, min(range_k - k, tile_k));
+ *
+ * When the function returns, all items have been processed and the thread pool
+ * is ready for a new task.
+ *
+ * @note If multiple threads call this function with the same thread pool, the
+ *    calls are serialized.
+ *
+ * @param threadpool  the thread pool to use for parallelisation. If threadpool
+ *    is NULL, all items are processed serially on the calling thread.
+ * @param function    the function to call for each tile.
+ * @param context     the first argument passed to the specified function.
+ * @param range_i     the number of items to process along the first dimension
+ *    of the 3D grid.
+ * @param range_j     the number of items to process along the second dimension
+ *    of the 3D grid.
+ * @param range_k     the number of items to process along the third dimension
+ *    of the 3D grid.
+ * @param tile_k      the maximum number of items along the third dimension of
+ *    the 3D grid to process in one function call.
+ * @param flags       a bitwise combination of zero or more optional flags
+ *    (PTHREADPOOL_FLAG_DISABLE_DENORMALS or PTHREADPOOL_FLAG_YIELD_WORKERS)
+ */
+void pthreadpool_parallelize_3d_tile_1d(
+	pthreadpool_t threadpool,
+	pthreadpool_task_3d_tile_1d_t function,
+	void* context,
+	size_t range_i,
+	size_t range_j,
+	size_t range_k,
+	size_t tile_k,
+	uint32_t flags);
+
+/**
  * Process items on a 3D grid with the specified maximum tile size along the
  * last two grid dimensions.
  *
@@ -465,6 +551,94 @@ void pthreadpool_parallelize_3d_tile_2d_with_uarch(
 	size_t range_k,
 	size_t tile_j,
 	size_t tile_k,
+	uint32_t flags);
+
+/**
+ * Process items on a 4D grid.
+ *
+ * The function implements a parallel version of the following snippet:
+ *
+ *   for (size_t i = 0; i < range_i; i++)
+ *     for (size_t j = 0; j < range_j; j++)
+ *       for (size_t k = 0; k < range_k; k++)
+ *         for (size_t l = 0; l < range_l; l++)
+ *           function(context, i, j, k, l);
+ *
+ * When the function returns, all items have been processed and the thread pool
+ * is ready for a new task.
+ *
+ * @note If multiple threads call this function with the same thread pool, the
+ *    calls are serialized.
+ *
+ * @param threadpool  the thread pool to use for parallelisation. If threadpool
+ *    is NULL, all items are processed serially on the calling thread.
+ * @param function    the function to call for each tile.
+ * @param context     the first argument passed to the specified function.
+ * @param range_i     the number of items to process along the first dimension
+ *    of the 4D grid.
+ * @param range_j     the number of items to process along the second dimension
+ *    of the 4D grid.
+ * @param range_k     the number of items to process along the third dimension
+ *    of the 4D grid.
+ * @param range_l     the number of items to process along the fourth dimension
+ *    of the 4D grid.
+ * @param flags       a bitwise combination of zero or more optional flags
+ *    (PTHREADPOOL_FLAG_DISABLE_DENORMALS or PTHREADPOOL_FLAG_YIELD_WORKERS)
+ */
+void pthreadpool_parallelize_4d(
+	pthreadpool_t threadpool,
+	pthreadpool_task_4d_t function,
+	void* context,
+	size_t range_i,
+	size_t range_j,
+	size_t range_k,
+	size_t range_l,
+	uint32_t flags);
+
+/**
+ * Process items on a 4D grid with the specified maximum tile size along the
+ * last grid dimension.
+ *
+ * The function implements a parallel version of the following snippet:
+ *
+ *   for (size_t i = 0; i < range_i; i++)
+ *     for (size_t j = 0; j < range_j; j++)
+ *       for (size_t k = 0; k < range_k; k++)
+ *         for (size_t l = 0; l < range_l; l += tile_l)
+ *           function(context, i, j, k, l, min(range_l - l, tile_l));
+ *
+ * When the function returns, all items have been processed and the thread pool
+ * is ready for a new task.
+ *
+ * @note If multiple threads call this function with the same thread pool, the
+ *    calls are serialized.
+ *
+ * @param threadpool  the thread pool to use for parallelisation. If threadpool
+ *    is NULL, all items are processed serially on the calling thread.
+ * @param function    the function to call for each tile.
+ * @param context     the first argument passed to the specified function.
+ * @param range_i     the number of items to process along the first dimension
+ *    of the 4D grid.
+ * @param range_j     the number of items to process along the second dimension
+ *    of the 4D grid.
+ * @param range_k     the number of items to process along the third dimension
+ *    of the 4D grid.
+ * @param range_l     the number of items to process along the fourth dimension
+ *    of the 4D grid.
+ * @param tile_l      the maximum number of items along the fourth dimension of
+ *    the 4D grid to process in one function call.
+ * @param flags       a bitwise combination of zero or more optional flags
+ *    (PTHREADPOOL_FLAG_DISABLE_DENORMALS or PTHREADPOOL_FLAG_YIELD_WORKERS)
+ */
+void pthreadpool_parallelize_4d_tile_1d(
+	pthreadpool_t threadpool,
+	pthreadpool_task_4d_tile_1d_t function,
+	void* context,
+	size_t range_i,
+	size_t range_j,
+	size_t range_k,
+	size_t range_l,
+	size_t tile_l,
 	uint32_t flags);
 
 /**
@@ -581,6 +755,102 @@ void pthreadpool_parallelize_4d_tile_2d_with_uarch(
 	size_t range_l,
 	size_t tile_k,
 	size_t tile_l,
+	uint32_t flags);
+
+/**
+ * Process items on a 5D grid.
+ *
+ * The function implements a parallel version of the following snippet:
+ *
+ *   for (size_t i = 0; i < range_i; i++)
+ *     for (size_t j = 0; j < range_j; j++)
+ *       for (size_t k = 0; k < range_k; k++)
+ *         for (size_t l = 0; l < range_l; l++)
+ *           for (size_t m = 0; m < range_m; m++)
+ *             function(context, i, j, k, l, m);
+ *
+ * When the function returns, all items have been processed and the thread pool
+ * is ready for a new task.
+ *
+ * @note If multiple threads call this function with the same thread pool, the
+ *    calls are serialized.
+ *
+ * @param threadpool  the thread pool to use for parallelisation. If threadpool
+ *    is NULL, all items are processed serially on the calling thread.
+ * @param function    the function to call for each tile.
+ * @param context     the first argument passed to the specified function.
+ * @param range_i     the number of items to process along the first dimension
+ *    of the 5D grid.
+ * @param range_j     the number of items to process along the second dimension
+ *    of the 5D grid.
+ * @param range_k     the number of items to process along the third dimension
+ *    of the 5D grid.
+ * @param range_l     the number of items to process along the fourth dimension
+ *    of the 5D grid.
+ * @param range_m     the number of items to process along the fifth dimension
+ *    of the 5D grid.
+ * @param flags       a bitwise combination of zero or more optional flags
+ *    (PTHREADPOOL_FLAG_DISABLE_DENORMALS or PTHREADPOOL_FLAG_YIELD_WORKERS)
+ */
+void pthreadpool_parallelize_5d(
+	pthreadpool_t threadpool,
+	pthreadpool_task_5d_t function,
+	void* context,
+	size_t range_i,
+	size_t range_j,
+	size_t range_k,
+	size_t range_l,
+	size_t range_m,
+	uint32_t flags);
+
+/**
+ * Process items on a 5D grid with the specified maximum tile size along the
+ * last grid dimension.
+ *
+ * The function implements a parallel version of the following snippet:
+ *
+ *   for (size_t i = 0; i < range_i; i++)
+ *     for (size_t j = 0; j < range_j; j++)
+ *       for (size_t k = 0; k < range_k; k++)
+ *         for (size_t l = 0; l < range_l; l++)
+ *           for (size_t m = 0; m < range_m; m += tile_m)
+ *             function(context, i, j, k, l, m, min(range_m - m, tile_m));
+ *
+ * When the function returns, all items have been processed and the thread pool
+ * is ready for a new task.
+ *
+ * @note If multiple threads call this function with the same thread pool, the
+ *    calls are serialized.
+ *
+ * @param threadpool  the thread pool to use for parallelisation. If threadpool
+ *    is NULL, all items are processed serially on the calling thread.
+ * @param function    the function to call for each tile.
+ * @param context     the first argument passed to the specified function.
+ * @param range_i     the number of items to process along the first dimension
+ *    of the 5D grid.
+ * @param range_j     the number of items to process along the second dimension
+ *    of the 5D grid.
+ * @param range_k     the number of items to process along the third dimension
+ *    of the 5D grid.
+ * @param range_l     the number of items to process along the fourth dimension
+ *    of the 5D grid.
+ * @param range_m     the number of items to process along the fifth dimension
+ *    of the 5D grid.
+ * @param tile_m      the maximum number of items along the fifth dimension of
+ *    the 5D grid to process in one function call.
+ * @param flags       a bitwise combination of zero or more optional flags
+ *    (PTHREADPOOL_FLAG_DISABLE_DENORMALS or PTHREADPOOL_FLAG_YIELD_WORKERS)
+ */
+void pthreadpool_parallelize_5d_tile_1d(
+	pthreadpool_t threadpool,
+	pthreadpool_task_5d_tile_1d_t function,
+	void* context,
+	size_t range_i,
+	size_t range_j,
+	size_t range_k,
+	size_t range_l,
+	size_t range_m,
+	size_t tile_m,
 	uint32_t flags);
 
 /**

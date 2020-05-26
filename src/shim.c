@@ -133,6 +133,43 @@ void pthreadpool_parallelize_2d_tile_2d_with_uarch(
 	}
 }
 
+void pthreadpool_parallelize_3d(
+	pthreadpool_t threadpool,
+	pthreadpool_task_3d_t task,
+	void* argument,
+	size_t range_i,
+	size_t range_j,
+	size_t range_k,
+	uint32_t flags)
+{
+	for (size_t i = 0; i < range_i; i++) {
+		for (size_t j = 0; j < range_j; j++) {
+			for (size_t k = 0; k < range_k; k++) {
+				task(argument, i, j, k);
+			}
+		}
+	}
+}
+
+void pthreadpool_parallelize_3d_tile_1d(
+	pthreadpool_t threadpool,
+	pthreadpool_task_3d_tile_1d_t task,
+	void* argument,
+	size_t range_i,
+	size_t range_j,
+	size_t range_k,
+	size_t tile_k,
+	uint32_t flags)
+{
+	for (size_t i = 0; i < range_i; i++) {
+		for (size_t j = 0; j < range_j; j++) {
+			for (size_t k = 0; k < range_k; k += tile_k) {
+				task(argument, i, j, k, min(range_k - k, tile_k));
+			}
+		}
+	}
+}
+
 void pthreadpool_parallelize_3d_tile_2d(
 	pthreadpool_t threadpool,
 	pthreadpool_task_3d_tile_2d_t task,
@@ -172,6 +209,49 @@ void pthreadpool_parallelize_3d_tile_2d_with_uarch(
 			for (size_t k = 0; k < range_k; k += tile_k) {
 				task(argument, default_uarch_index, i, j, k,
 					min(range_j - j, tile_j), min(range_k - k, tile_k));
+			}
+		}
+	}
+}
+
+void pthreadpool_parallelize_4d(
+	pthreadpool_t threadpool,
+	pthreadpool_task_4d_t task,
+	void* argument,
+	size_t range_i,
+	size_t range_j,
+	size_t range_k,
+	size_t range_l,
+	uint32_t flags)
+{
+	for (size_t i = 0; i < range_i; i++) {
+		for (size_t j = 0; j < range_j; j++) {
+			for (size_t k = 0; k < range_k; k++) {
+				for (size_t l = 0; l < range_l; l++) {
+					task(argument, i, j, k, l);
+				}
+			}
+		}
+	}
+}
+
+void pthreadpool_parallelize_4d_tile_1d(
+	pthreadpool_t threadpool,
+	pthreadpool_task_4d_tile_1d_t task,
+	void* argument,
+	size_t range_i,
+	size_t range_j,
+	size_t range_k,
+	size_t range_l,
+	size_t tile_l,
+	uint32_t flags)
+{
+	for (size_t i = 0; i < range_i; i++) {
+		for (size_t j = 0; j < range_j; j++) {
+			for (size_t k = 0; k < range_k; k++) {
+				for (size_t l = 0; l < range_l; l += tile_l) {
+					task(argument, i, j, k, l, min(range_l - l, tile_l));
+				}
 			}
 		}
 	}
@@ -221,6 +301,55 @@ void pthreadpool_parallelize_4d_tile_2d_with_uarch(
 				for (size_t l = 0; l < range_l; l += tile_l) {
 					task(argument, default_uarch_index, i, j, k, l,
 						min(range_k - k, tile_k), min(range_l - l, tile_l));
+				}
+			}
+		}
+	}
+}
+
+void pthreadpool_parallelize_5d(
+	pthreadpool_t threadpool,
+	pthreadpool_task_5d_t task,
+	void* argument,
+	size_t range_i,
+	size_t range_j,
+	size_t range_k,
+	size_t range_l,
+	size_t range_m,
+	uint32_t flags)
+{
+	for (size_t i = 0; i < range_i; i++) {
+		for (size_t j = 0; j < range_j; j++) {
+			for (size_t k = 0; k < range_k; k++) {
+				for (size_t l = 0; l < range_l; l++) {
+					for (size_t m = 0; m < range_m; m++) {
+						task(argument, i, j, k, l, m);
+					}
+				}
+			}
+		}
+	}
+}
+
+void pthreadpool_parallelize_5d_tile_1d(
+	pthreadpool_t threadpool,
+	pthreadpool_task_5d_tile_1d_t task,
+	void* argument,
+	size_t range_i,
+	size_t range_j,
+	size_t range_k,
+	size_t range_l,
+	size_t range_m,
+	size_t tile_m,
+	uint32_t flags)
+{
+	for (size_t i = 0; i < range_i; i++) {
+		for (size_t j = 0; j < range_j; j++) {
+			for (size_t k = 0; k < range_k; k++) {
+				for (size_t l = 0; l < range_l; l++) {
+					for (size_t m = 0; m < range_m; m += tile_m) {
+						task(argument, i, j, k, l, m, min(range_m - m, tile_m));
+					}
 				}
 			}
 		}

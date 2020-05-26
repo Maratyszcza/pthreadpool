@@ -179,6 +179,36 @@ struct pthreadpool_2d_tile_2d_with_uarch_params {
 	struct fxdiv_divisor_size_t tile_range_j;
 };
 
+struct pthreadpool_3d_params {
+	/**
+	 * FXdiv divisor for the range_j argument passed to the pthreadpool_parallelize_3d function.
+	 */
+	struct fxdiv_divisor_size_t range_j;
+	/**
+	 * FXdiv divisor for the range_k argument passed to the pthreadpool_parallelize_3d function.
+	 */
+	struct fxdiv_divisor_size_t range_k;
+};
+
+struct pthreadpool_3d_tile_1d_params {
+	/**
+	 * Copy of the range_k argument passed to the pthreadpool_parallelize_3d_tile_1d function.
+	 */
+	size_t range_k;
+	/**
+	 * Copy of the tile_k argument passed to the pthreadpool_parallelize_3d_tile_1d function.
+	 */
+	size_t tile_k;
+	/**
+	 * FXdiv divisor for the range_j argument passed to the pthreadpool_parallelize_3d_tile_1d function.
+	 */
+	struct fxdiv_divisor_size_t range_j;
+	/**
+	 * FXdiv divisor for the divide_round_up(range_k, tile_k) value.
+	 */
+	struct fxdiv_divisor_size_t tile_range_k;
+};
+
 struct pthreadpool_3d_tile_2d_params {
 	/**
 	 * Copy of the range_j argument passed to the pthreadpool_parallelize_3d_tile_2d function.
@@ -239,6 +269,52 @@ struct pthreadpool_3d_tile_2d_with_uarch_params {
 	 * FXdiv divisor for the divide_round_up(range_k, tile_k) value.
 	 */
 	struct fxdiv_divisor_size_t tile_range_k;
+};
+
+struct pthreadpool_4d_params {
+	/**
+	 * Copy of the range_k argument passed to the pthreadpool_parallelize_4d function.
+	 */
+	size_t range_k;
+	/**
+	 * FXdiv divisor for the range_j argument passed to the pthreadpool_parallelize_4d function.
+	 */
+	struct fxdiv_divisor_size_t range_j;
+	/**
+	 * FXdiv divisor for the range_k * range_l value.
+	 */
+	struct fxdiv_divisor_size_t range_kl;
+	/**
+	 * FXdiv divisor for the range_l argument passed to the pthreadpool_parallelize_4d function.
+	 */
+	struct fxdiv_divisor_size_t range_l;
+};
+
+struct pthreadpool_4d_tile_1d_params {
+	/**
+	 * Copy of the range_k argument passed to the pthreadpool_parallelize_4d_tile_1d function.
+	 */
+	size_t range_k;
+	/**
+	 * Copy of the range_l argument passed to the pthreadpool_parallelize_4d_tile_1d function.
+	 */
+	size_t range_l;
+	/**
+	 * Copy of the tile_l argument passed to the pthreadpool_parallelize_4d_tile_1d function.
+	 */
+	size_t tile_l;
+	/**
+	 * FXdiv divisor for the range_j argument passed to the pthreadpool_parallelize_4d_tile_1d function.
+	 */
+	struct fxdiv_divisor_size_t range_j;
+	/**
+	 * FXdiv divisor for the range_k * divide_round_up(range_l, tile_l) value.
+	 */
+	struct fxdiv_divisor_size_t tile_range_kl;
+	/**
+	 * FXdiv divisor for the divide_round_up(range_l, tile_l) value.
+	 */
+	struct fxdiv_divisor_size_t tile_range_l;
 };
 
 struct pthreadpool_4d_tile_2d_params {
@@ -309,6 +385,60 @@ struct pthreadpool_4d_tile_2d_with_uarch_params {
 	 * FXdiv divisor for the divide_round_up(range_l, tile_l) value.
 	 */
 	struct fxdiv_divisor_size_t tile_range_l;
+};
+
+struct pthreadpool_5d_params {
+	/**
+	 * Copy of the range_l argument passed to the pthreadpool_parallelize_5d function.
+	 */
+	size_t range_l;
+	/**
+	 * FXdiv divisor for the range_j argument passed to the pthreadpool_parallelize_5d function.
+	 */
+	struct fxdiv_divisor_size_t range_j;
+	/**
+	 * FXdiv divisor for the range_k argument passed to the pthreadpool_parallelize_5d function.
+	 */
+	struct fxdiv_divisor_size_t range_k;
+	/**
+	 * FXdiv divisor for the range_l * range_m value.
+	 */
+	struct fxdiv_divisor_size_t range_lm;
+	/**
+	 * FXdiv divisor for the range_m argument passed to the pthreadpool_parallelize_5d function.
+	 */
+	struct fxdiv_divisor_size_t range_m;
+};
+
+struct pthreadpool_5d_tile_1d_params {
+	/**
+	 * Copy of the range_k argument passed to the pthreadpool_parallelize_5d_tile_1d function.
+	 */
+	size_t range_k;
+	/**
+	 * Copy of the range_m argument passed to the pthreadpool_parallelize_5d_tile_1d function.
+	 */
+	size_t range_m;
+	/**
+	 * Copy of the tile_m argument passed to the pthreadpool_parallelize_5d_tile_1d function.
+	 */
+	size_t tile_m;
+	/**
+	 * FXdiv divisor for the range_j argument passed to the pthreadpool_parallelize_5d_tile_1d function.
+	 */
+	struct fxdiv_divisor_size_t range_j;
+	/**
+	 * FXdiv divisor for the range_k * range_l value.
+	 */
+	struct fxdiv_divisor_size_t range_kl;
+	/**
+	 * FXdiv divisor for the range_l argument passed to the pthreadpool_parallelize_5d_tile_1d function.
+	 */
+	struct fxdiv_divisor_size_t range_l;
+	/**
+	 * FXdiv divisor for the divide_round_up(range_m, tile_m) value.
+	 */
+	struct fxdiv_divisor_size_t tile_range_m;
 };
 
 struct pthreadpool_5d_tile_2d_params {
@@ -434,10 +564,16 @@ struct PTHREADPOOL_CACHELINE_ALIGNED pthreadpool {
 		struct pthreadpool_2d_tile_1d_params parallelize_2d_tile_1d;
 		struct pthreadpool_2d_tile_2d_params parallelize_2d_tile_2d;
 		struct pthreadpool_2d_tile_2d_with_uarch_params parallelize_2d_tile_2d_with_uarch;
+		struct pthreadpool_3d_params parallelize_3d;
+		struct pthreadpool_3d_tile_1d_params parallelize_3d_tile_1d;
 		struct pthreadpool_3d_tile_2d_params parallelize_3d_tile_2d;
 		struct pthreadpool_3d_tile_2d_with_uarch_params parallelize_3d_tile_2d_with_uarch;
+		struct pthreadpool_4d_params parallelize_4d;
+		struct pthreadpool_4d_tile_1d_params parallelize_4d_tile_1d;
 		struct pthreadpool_4d_tile_2d_params parallelize_4d_tile_2d;
 		struct pthreadpool_4d_tile_2d_with_uarch_params parallelize_4d_tile_2d_with_uarch;
+		struct pthreadpool_5d_params parallelize_5d;
+		struct pthreadpool_5d_tile_1d_params parallelize_5d_tile_1d;
 		struct pthreadpool_5d_tile_2d_params parallelize_5d_tile_2d;
 		struct pthreadpool_6d_tile_2d_params parallelize_6d_tile_2d;
 	} params;
@@ -555,6 +691,14 @@ PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_2d_tile_2d_with_uarch_f
 	struct pthreadpool* threadpool,
 	struct thread_info* thread);
 
+PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_3d_fastpath(
+	struct pthreadpool* threadpool,
+	struct thread_info* thread);
+
+PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_3d_tile_1d_fastpath(
+	struct pthreadpool* threadpool,
+	struct thread_info* thread);
+
 PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_3d_tile_2d_fastpath(
 	struct pthreadpool* threadpool,
 	struct thread_info* thread);
@@ -563,11 +707,27 @@ PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_3d_tile_2d_with_uarch_f
 	struct pthreadpool* threadpool,
 	struct thread_info* thread);
 
+PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_4d_fastpath(
+	struct pthreadpool* threadpool,
+	struct thread_info* thread);
+
+PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_4d_tile_1d_fastpath(
+	struct pthreadpool* threadpool,
+	struct thread_info* thread);
+
 PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_4d_tile_2d_fastpath(
 	struct pthreadpool* threadpool,
 	struct thread_info* thread);
 
 PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_4d_tile_2d_with_uarch_fastpath(
+	struct pthreadpool* threadpool,
+	struct thread_info* thread);
+
+PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_5d_fastpath(
+	struct pthreadpool* threadpool,
+	struct thread_info* thread);
+
+PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_5d_tile_1d_fastpath(
 	struct pthreadpool* threadpool,
 	struct thread_info* thread);
 
