@@ -71,7 +71,7 @@ PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_1d_with_uarch_fastpath(
 	const uint32_t default_uarch_index = threadpool->params.parallelize_1d_with_uarch.default_uarch_index;
 	uint32_t uarch_index = default_uarch_index;
 	#if PTHREADPOOL_USE_CPUINFO
-		uarch_index = cpuinfo_get_current_uarch_index();
+		uarch_index = cpuinfo_get_current_uarch_index_with_default(default_uarch_index);
 		if (uarch_index > threadpool->params.parallelize_1d_with_uarch.max_uarch_index) {
 			uarch_index = default_uarch_index;
 		}
@@ -307,7 +307,7 @@ PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_2d_tile_2d_with_uarch_f
 	const uint32_t default_uarch_index = threadpool->params.parallelize_2d_tile_2d_with_uarch.default_uarch_index;
 	uint32_t uarch_index = default_uarch_index;
 	#if PTHREADPOOL_USE_CPUINFO
-		uarch_index = cpuinfo_get_current_uarch_index();
+		uarch_index = cpuinfo_get_current_uarch_index_with_default(default_uarch_index);
 		if (uarch_index > threadpool->params.parallelize_2d_tile_2d_with_uarch.max_uarch_index) {
 			uarch_index = default_uarch_index;
 		}
@@ -540,7 +540,7 @@ PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_3d_tile_2d_with_uarch_f
 	const uint32_t default_uarch_index = threadpool->params.parallelize_3d_tile_2d_with_uarch.default_uarch_index;
 	uint32_t uarch_index = default_uarch_index;
 	#if PTHREADPOOL_USE_CPUINFO
-		uarch_index = cpuinfo_get_current_uarch_index();
+		uarch_index = cpuinfo_get_current_uarch_index_with_default(default_uarch_index);
 		if (uarch_index > threadpool->params.parallelize_3d_tile_2d_with_uarch.max_uarch_index) {
 			uarch_index = default_uarch_index;
 		}
@@ -804,7 +804,7 @@ PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_4d_tile_2d_with_uarch_f
 	const uint32_t default_uarch_index = threadpool->params.parallelize_4d_tile_2d_with_uarch.default_uarch_index;
 	uint32_t uarch_index = default_uarch_index;
 	#if PTHREADPOOL_USE_CPUINFO
-		uarch_index = cpuinfo_get_current_uarch_index();
+		uarch_index = cpuinfo_get_current_uarch_index_with_default(default_uarch_index);
 		if (uarch_index > threadpool->params.parallelize_4d_tile_2d_with_uarch.max_uarch_index) {
 			uarch_index = default_uarch_index;
 		}

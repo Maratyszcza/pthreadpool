@@ -70,7 +70,7 @@ static void thread_parallelize_1d_with_uarch(struct pthreadpool* threadpool, str
 	const uint32_t default_uarch_index = threadpool->params.parallelize_1d_with_uarch.default_uarch_index;
 	uint32_t uarch_index = default_uarch_index;
 	#if PTHREADPOOL_USE_CPUINFO
-		uarch_index = cpuinfo_get_current_uarch_index();
+		uarch_index = cpuinfo_get_current_uarch_index_with_default(default_uarch_index);
 		if (uarch_index > threadpool->params.parallelize_1d_with_uarch.max_uarch_index) {
 			uarch_index = default_uarch_index;
 		}
@@ -281,7 +281,7 @@ static void thread_parallelize_2d_tile_2d_with_uarch(struct pthreadpool* threadp
 	const uint32_t default_uarch_index = threadpool->params.parallelize_2d_tile_2d_with_uarch.default_uarch_index;
 	uint32_t uarch_index = default_uarch_index;
 	#if PTHREADPOOL_USE_CPUINFO
-		uarch_index = cpuinfo_get_current_uarch_index();
+		uarch_index = cpuinfo_get_current_uarch_index_with_default(default_uarch_index);
 		if (uarch_index > threadpool->params.parallelize_2d_tile_2d_with_uarch.max_uarch_index) {
 			uarch_index = default_uarch_index;
 		}
@@ -494,7 +494,7 @@ static void thread_parallelize_3d_tile_2d_with_uarch(struct pthreadpool* threadp
 	const uint32_t default_uarch_index = threadpool->params.parallelize_3d_tile_2d_with_uarch.default_uarch_index;
 	uint32_t uarch_index = default_uarch_index;
 	#if PTHREADPOOL_USE_CPUINFO
-		uarch_index = cpuinfo_get_current_uarch_index();
+		uarch_index = cpuinfo_get_current_uarch_index_with_default(default_uarch_index);
 		if (uarch_index > threadpool->params.parallelize_3d_tile_2d_with_uarch.max_uarch_index) {
 			uarch_index = default_uarch_index;
 		}
@@ -738,7 +738,7 @@ static void thread_parallelize_4d_tile_2d_with_uarch(struct pthreadpool* threadp
 	const uint32_t default_uarch_index = threadpool->params.parallelize_4d_tile_2d_with_uarch.default_uarch_index;
 	uint32_t uarch_index = default_uarch_index;
 	#if PTHREADPOOL_USE_CPUINFO
-		uarch_index = cpuinfo_get_current_uarch_index();
+		uarch_index = cpuinfo_get_current_uarch_index_with_default(default_uarch_index);
 		if (uarch_index > threadpool->params.parallelize_4d_tile_2d_with_uarch.max_uarch_index) {
 			uarch_index = default_uarch_index;
 		}
@@ -1131,7 +1131,7 @@ void pthreadpool_parallelize_1d_with_uarch(
 
 		uint32_t uarch_index = default_uarch_index;
 		#if PTHREADPOOL_USE_CPUINFO
-			uarch_index = cpuinfo_get_current_uarch_index();
+			uarch_index = cpuinfo_get_current_uarch_index_with_default(default_uarch_index);
 			if (uarch_index > max_uarch_index) {
 				uarch_index = default_uarch_index;
 			}
@@ -1363,7 +1363,7 @@ void pthreadpool_parallelize_2d_tile_2d_with_uarch(
 
 		uint32_t uarch_index = default_uarch_index;
 		#if PTHREADPOOL_USE_CPUINFO
-			uarch_index = cpuinfo_get_current_uarch_index();
+			uarch_index = cpuinfo_get_current_uarch_index_with_default(default_uarch_index);
 			if (uarch_index > max_uarch_index) {
 				uarch_index = default_uarch_index;
 			}
@@ -1577,7 +1577,7 @@ void pthreadpool_parallelize_3d_tile_2d_with_uarch(
 
 		uint32_t uarch_index = default_uarch_index;
 		#if PTHREADPOOL_USE_CPUINFO
-			uarch_index = cpuinfo_get_current_uarch_index();
+			uarch_index = cpuinfo_get_current_uarch_index_with_default(default_uarch_index);
 			if (uarch_index > max_uarch_index) {
 				uarch_index = default_uarch_index;
 			}
@@ -1812,7 +1812,7 @@ void pthreadpool_parallelize_4d_tile_2d_with_uarch(
 
 		uint32_t uarch_index = default_uarch_index;
 		#if PTHREADPOOL_USE_CPUINFO
-			uarch_index = cpuinfo_get_current_uarch_index();
+			uarch_index = cpuinfo_get_current_uarch_index_with_default(default_uarch_index);
 			if (uarch_index > max_uarch_index) {
 				uarch_index = default_uarch_index;
 			}
