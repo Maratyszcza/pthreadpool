@@ -66,6 +66,7 @@ cc_library(
     }) + select({
         ":linux_arm": ["-DPTHREADPOOL_USE_CPUINFO=1"],
         ":linux_armhf": ["-DPTHREADPOOL_USE_CPUINFO=1"],
+        ":linux_armv7a": ["-DPTHREADPOOL_USE_CPUINFO=1"],
         ":linux_aarch64": ["-DPTHREADPOOL_USE_CPUINFO=1"],
         ":android_armv7": ["-DPTHREADPOOL_USE_CPUINFO=1"],
         ":android_arm64": ["-DPTHREADPOOL_USE_CPUINFO=1"],
@@ -132,6 +133,7 @@ cc_library(
     ] + select({
         ":linux_arm": ["@cpuinfo"],
         ":linux_armhf": ["@cpuinfo"],
+        ":linux_armv7a": ["@cpuinfo"],
         ":linux_aarch64": ["@cpuinfo"],
         ":android_armv7": ["@cpuinfo"],
         ":android_arm64": ["@cpuinfo"],
@@ -245,6 +247,11 @@ config_setting(
 config_setting(
     name = "linux_armhf",
     values = {"cpu": "armhf"},
+)
+
+config_setting(
+    name = "linux_armv7a",
+    values = {"cpu": "armv7a"},
 )
 
 config_setting(
