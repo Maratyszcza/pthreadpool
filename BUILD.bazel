@@ -65,6 +65,7 @@ cc_library(
         "//conditions:default": [],
     }) + select({
         ":linux_arm": ["-DPTHREADPOOL_USE_CPUINFO=1"],
+        ":linux_armeabi": ["-DPTHREADPOOL_USE_CPUINFO=1"],
         ":linux_armhf": ["-DPTHREADPOOL_USE_CPUINFO=1"],
         ":linux_armv7a": ["-DPTHREADPOOL_USE_CPUINFO=1"],
         ":linux_aarch64": ["-DPTHREADPOOL_USE_CPUINFO=1"],
@@ -132,6 +133,7 @@ cc_library(
         "@FXdiv",
     ] + select({
         ":linux_arm": ["@cpuinfo"],
+        ":linux_armeabi": ["@cpuinfo"],
         ":linux_armhf": ["@cpuinfo"],
         ":linux_armv7a": ["@cpuinfo"],
         ":linux_aarch64": ["@cpuinfo"],
@@ -242,6 +244,11 @@ config_setting(
 config_setting(
     name = "linux_arm",
     values = {"cpu": "arm"},
+)
+
+config_setting(
+    name = "linux_armeabi",
+    values = {"cpu": "armeabi"},
 )
 
 config_setting(
