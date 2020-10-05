@@ -130,7 +130,7 @@
 	static inline void pthreadpool_fence_release() {
 		__c11_atomic_thread_fence(__ATOMIC_RELEASE);
 	}
-#elif defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L)
+#elif defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L) && !defined(_MSC_VER)
 	#include <stdatomic.h>
 
 	typedef _Atomic(uint32_t) pthreadpool_atomic_uint32_t;
