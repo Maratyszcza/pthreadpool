@@ -247,6 +247,110 @@
 	static inline void pthreadpool_fence_release() {
 		atomic_thread_fence(memory_order_release);
 	}
+#elif defined(__GNUC__)
+	typedef uint32_t volatile pthreadpool_atomic_uint32_t;
+	typedef size_t volatile   pthreadpool_atomic_size_t;
+	typedef void* volatile    pthreadpool_atomic_void_p;
+
+	static inline uint32_t pthreadpool_load_relaxed_uint32_t(
+		pthreadpool_atomic_uint32_t* address)
+	{
+		return *address;
+	}
+
+	static inline size_t pthreadpool_load_relaxed_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		return *address;
+	}
+
+	static inline void* pthreadpool_load_relaxed_void_p(
+		pthreadpool_atomic_void_p* address)
+	{
+		return *address;
+	}
+
+	static inline uint32_t pthreadpool_load_acquire_uint32_t(
+		pthreadpool_atomic_uint32_t* address)
+	{
+		return *address;
+	}
+
+	static inline size_t pthreadpool_load_acquire_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		return *address;
+	}
+
+	static inline void pthreadpool_store_relaxed_uint32_t(
+		pthreadpool_atomic_uint32_t* address,
+		uint32_t value)
+	{
+		*address = value;
+	}
+
+	static inline void pthreadpool_store_relaxed_size_t(
+		pthreadpool_atomic_size_t* address,
+		size_t value)
+	{
+		*address = value;
+	}
+
+	static inline void pthreadpool_store_relaxed_void_p(
+		pthreadpool_atomic_void_p* address,
+		void* value)
+	{
+		*address = value;
+	}
+
+	static inline void pthreadpool_store_release_uint32_t(
+		pthreadpool_atomic_uint32_t* address,
+		uint32_t value)
+	{
+		*address = value;
+	}
+
+	static inline void pthreadpool_store_release_size_t(
+		pthreadpool_atomic_size_t* address,
+		size_t value)
+	{
+		*address = value;
+	}
+
+	static inline size_t pthreadpool_decrement_fetch_relaxed_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		return __sync_sub_and_fetch(address, 1);
+	}
+
+	static inline size_t pthreadpool_decrement_fetch_release_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		return __sync_sub_and_fetch(address, 1);
+	}
+
+	static inline bool pthreadpool_try_decrement_relaxed_size_t(
+		pthreadpool_atomic_size_t* value)
+	{
+		size_t actual_value = *value;
+		while (actual_value != 0) {
+			const size_t new_value = actual_value - 1;
+			const size_t expected_value = actual_value;
+			actual_value = __sync_val_compare_and_swap(value, expected_value, new_value);
+			if (actual_value == expected_value) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	static inline void pthreadpool_fence_acquire() {
+		__sync_synchronize();
+	}
+
+	static inline void pthreadpool_fence_release() {
+		__sync_synchronize();
+	}
 #elif defined(_MSC_VER) && defined(_M_X64)
 	typedef volatile uint32_t pthreadpool_atomic_uint32_t;
 	typedef volatile size_t   pthreadpool_atomic_size_t;
