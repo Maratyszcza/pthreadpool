@@ -112,6 +112,11 @@ static inline size_t divide_round_up(size_t dividend, size_t divisor) {
 	}
 }
 
+/* Windows headers define min and max macros; undefine it here */
+#ifdef min
+	#undef min
+#endif
+
 static inline size_t min(size_t a, size_t b) {
 	return a < b ? a : b;
 }
