@@ -20,6 +20,9 @@
 
 /* Windows headers */
 #if PTHREADPOOL_USE_EVENT
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
 #endif
 
