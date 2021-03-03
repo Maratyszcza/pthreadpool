@@ -41,6 +41,7 @@ cc_library(
         ":emscripten": INTERNAL_HDRS + SHIM_IMPL_SRCS,
         ":macos_x86": INTERNAL_HDRS + GCD_IMPL_SRCS,
         ":macos_x86_64": INTERNAL_HDRS + GCD_IMPL_SRCS,
+        ":macos_arm64": INTERNAL_HDRS + GCD_IMPL_SRCS,
         ":ios": INTERNAL_HDRS + GCD_IMPL_SRCS,
         ":watchos": INTERNAL_HDRS + GCD_IMPL_SRCS,
         ":tvos": INTERNAL_HDRS + GCD_IMPL_SRCS,
@@ -53,6 +54,7 @@ cc_library(
         ":windows_x86_64": ARCH_SPECIFIC_SRCS,
         ":macos_x86": ARCH_SPECIFIC_SRCS,
         ":macos_x86_64": ARCH_SPECIFIC_SRCS,
+        ":macos_arm64": ARCH_SPECIFIC_SRCS,
         ":ios_x86": ARCH_SPECIFIC_SRCS,
         ":ios_x86_64": ARCH_SPECIFIC_SRCS,
         ":watchos_x86": ARCH_SPECIFIC_SRCS,
@@ -107,6 +109,7 @@ cc_library(
         ":windows_x86_64": ["-DPTHREADPOOL_USE_FASTPATH=1"],
         ":macos_x86": ["-DPTHREADPOOL_USE_FASTPATH=1"],
         ":macos_x86_64": ["-DPTHREADPOOL_USE_FASTPATH=1"],
+        ":macos_arm64": ["-DPTHREADPOOL_USE_FASTPATH=1"],
         ":ios_x86": ["-DPTHREADPOOL_USE_FASTPATH=1"],
         ":ios_x86_64": ["-DPTHREADPOOL_USE_FASTPATH=1"],
         ":watchos_x86": ["-DPTHREADPOOL_USE_FASTPATH=1"],
@@ -316,6 +319,14 @@ config_setting(
     values = {
         "apple_platform_type": "macos",
         "cpu": "darwin_x86_64",
+    },
+)
+
+config_setting(
+    name = "macos_arm64",
+    values = {
+        "apple_platform_type": "macos",
+        "cpu": "darwin_arm64",
     },
 )
 
