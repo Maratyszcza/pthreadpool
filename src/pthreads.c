@@ -79,7 +79,7 @@
 
 static void checkin_worker_thread(struct pthreadpool* threadpool) {
 	#if PTHREADPOOL_USE_FUTEX
-		if (pthreadpool_decrement_fetch_relaxed_size_t(&threadpool->active_threads) == 0) {
+		if (pthreadpool_decrement_fetch_acquire_release_size_t(&threadpool->active_threads) == 0) {
 			pthreadpool_store_release_uint32_t(&threadpool->has_active_threads, 0);
 			futex_wake_all(&threadpool->has_active_threads);
 		}

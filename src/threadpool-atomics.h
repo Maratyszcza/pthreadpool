@@ -109,6 +109,12 @@
 		return __c11_atomic_fetch_sub(address, 1, __ATOMIC_RELEASE) - 1;
 	}
 
+	static inline size_t pthreadpool_decrement_fetch_acquire_release_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		return __c11_atomic_fetch_sub(address, 1, __ATOMIC_ACQ_REL) - 1;
+	}
+
 	static inline bool pthreadpool_try_decrement_relaxed_size_t(
 		pthreadpool_atomic_size_t* value)
 	{
@@ -212,6 +218,12 @@
 		pthreadpool_atomic_size_t* address)
 	{
 		return atomic_fetch_sub_explicit(address, 1, memory_order_release) - 1;
+	}
+
+	static inline size_t pthreadpool_decrement_fetch_acquire_release_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		return atomic_fetch_sub_explicit(address, 1, memory_order_acq_rel) - 1;
 	}
 
 	static inline bool pthreadpool_try_decrement_relaxed_size_t(
@@ -329,6 +341,12 @@
 		return __sync_sub_and_fetch(address, 1);
 	}
 
+	static inline size_t pthreadpool_decrement_fetch_acquire_release_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		return __sync_sub_and_fetch(address, 1);
+	}
+
 	static inline bool pthreadpool_try_decrement_relaxed_size_t(
 		pthreadpool_atomic_size_t* value)
 	{
@@ -438,6 +456,12 @@
 	}
 
 	static inline size_t pthreadpool_decrement_fetch_release_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		return (size_t) _InterlockedDecrement64((volatile __int64*) address);
+	}
+
+	static inline size_t pthreadpool_decrement_fetch_acquire_release_size_t(
 		pthreadpool_atomic_size_t* address)
 	{
 		return (size_t) _InterlockedDecrement64((volatile __int64*) address);
@@ -560,6 +584,12 @@
 		return (size_t) _InterlockedDecrement((volatile long*) address);
 	}
 
+	static inline size_t pthreadpool_decrement_fetch_acquire_release_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		return (size_t) _InterlockedDecrement((volatile long*) address);
+	}
+
 	static inline bool pthreadpool_try_decrement_relaxed_size_t(
 		pthreadpool_atomic_size_t* value)
 	{
@@ -665,6 +695,12 @@
 		pthreadpool_atomic_size_t* address)
 	{
 		return (size_t) _InterlockedDecrement64_rel((volatile __int64*) address);
+	}
+
+	static inline size_t pthreadpool_decrement_fetch_acquire_release_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		return (size_t) _InterlockedDecrement64((volatile __int64*) address);
 	}
 
 	static inline bool pthreadpool_try_decrement_relaxed_size_t(
@@ -782,6 +818,12 @@
 		pthreadpool_atomic_size_t* address)
 	{
 		return (size_t) _InterlockedDecrement_rel((volatile long*) address);
+	}
+
+	static inline size_t pthreadpool_decrement_fetch_acquire_release_size_t(
+		pthreadpool_atomic_size_t* address)
+	{
+		return (size_t) _InterlockedDecrement((volatile long*) address);
 	}
 
 	static inline bool pthreadpool_try_decrement_relaxed_size_t(
