@@ -1093,12 +1093,12 @@ void pthreadpool_destroy(pthreadpool_t threadpool);
 	#define PTHREADPOOL_DEPRECATED
 #endif
 
-typedef void (*pthreadpool_function_1d_t)(void*, size_t) PTHREADPOOL_DEPRECATED;
-typedef void (*pthreadpool_function_1d_tiled_t)(void*, size_t, size_t) PTHREADPOOL_DEPRECATED;
-typedef void (*pthreadpool_function_2d_t)(void*, size_t, size_t) PTHREADPOOL_DEPRECATED;
-typedef void (*pthreadpool_function_2d_tiled_t)(void*, size_t, size_t, size_t, size_t) PTHREADPOOL_DEPRECATED;
-typedef void (*pthreadpool_function_3d_tiled_t)(void*, size_t, size_t, size_t, size_t, size_t, size_t) PTHREADPOOL_DEPRECATED;
-typedef void (*pthreadpool_function_4d_tiled_t)(void*, size_t, size_t, size_t, size_t, size_t, size_t, size_t, size_t) PTHREADPOOL_DEPRECATED;
+typedef void (*pthreadpool_function_1d_t)(void*, size_t);
+typedef void (*pthreadpool_function_1d_tiled_t)(void*, size_t, size_t);
+typedef void (*pthreadpool_function_2d_t)(void*, size_t, size_t);
+typedef void (*pthreadpool_function_2d_tiled_t)(void*, size_t, size_t, size_t, size_t);
+typedef void (*pthreadpool_function_3d_tiled_t)(void*, size_t, size_t, size_t, size_t, size_t, size_t);
+typedef void (*pthreadpool_function_4d_tiled_t)(void*, size_t, size_t, size_t, size_t, size_t, size_t, size_t, size_t);
 
 void pthreadpool_compute_1d(
 	pthreadpool_t threadpool,
