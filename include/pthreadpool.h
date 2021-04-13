@@ -979,7 +979,7 @@ void pthreadpool_destroy(pthreadpool_t threadpool);
 #ifndef PTHREADPOOL_NO_DEPRECATED_API
 
 /* Legacy API for compatibility with pre-existing users (e.g. NNPACK) */
-#if defined(__GNUC__)
+#if defined(__GNUC__) && !defined(PTHREADPOOL_NO_DEPRECATION_WARNINGS)
 	#define PTHREADPOOL_DEPRECATED __attribute__((__deprecated__))
 #else
 	#define PTHREADPOOL_DEPRECATED
