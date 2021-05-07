@@ -178,6 +178,13 @@ IF(PTHREADPOOL_BUILD_TESTS)
     CXX_EXTENSIONS NO)
   TARGET_LINK_LIBRARIES(pthreadpool-test pthreadpool gtest gtest_main)
   ADD_TEST(pthreadpool pthreadpool-test)
+
+  ADD_EXECUTABLE(pthreadpool-cxx-test test/pthreadpool-cxx.cc)
+  SET_TARGET_PROPERTIES(pthreadpool-cxx-test PROPERTIES
+    CXX_STANDARD 11
+    CXX_EXTENSIONS NO)
+  TARGET_LINK_LIBRARIES(pthreadpool-cxx-test pthreadpool gtest gtest_main)
+  ADD_TEST(pthreadpool-cxx pthreadpool-cxx-test)
 ENDIF()
 
 IF(PTHREADPOOL_BUILD_BENCHMARKS)

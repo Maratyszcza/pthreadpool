@@ -173,6 +173,19 @@ cc_test(
     ],
 )
 
+cc_test(
+    name = "pthreadpool_cxx_test",
+    srcs = ["test/pthreadpool-cxx.cc"],
+    linkopts = select({
+        ":emscripten": EMSCRIPTEN_TEST_LINKOPTS,
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":pthreadpool",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
 ################################## Benchmarks ##################################
 
 EMSCRIPTEN_BENCHMARK_LINKOPTS = [
