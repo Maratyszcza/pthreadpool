@@ -20,11 +20,11 @@
 
 
 PTHREADPOOL_INTERNAL struct pthreadpool* pthreadpool_allocate(
-	size_t threads_count)
+	size_t max_threads_count)
 {
-	assert(threads_count >= 1);
+	assert(max_threads_count >= 1);
 
-	const size_t threadpool_size = sizeof(struct pthreadpool) + threads_count * sizeof(struct thread_info);
+	const size_t threadpool_size = sizeof(struct pthreadpool) + max_threads_count * sizeof(struct thread_info);
 	struct pthreadpool* threadpool = NULL;
 	#if defined(__ANDROID__)
 		/*
@@ -55,7 +55,7 @@ PTHREADPOOL_INTERNAL void pthreadpool_deallocate(
 {
 	assert(threadpool != NULL);
 
-	const size_t threadpool_size = sizeof(struct pthreadpool) + threadpool->threads_count.value * sizeof(struct thread_info);
+	const size_t threadpool_size = sizeof(struct pthreadpool) + threadpool->max_threads_count.value * sizeof(struct thread_info);
 	memset(threadpool, 0, threadpool_size);
 
 	#ifdef _WIN32

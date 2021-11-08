@@ -7474,7 +7474,7 @@ TEST(CapNumThreadsTest, RunUnderCapacity) {
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(num_threads), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
-	pthreadpool_set_num_threads_to_use(2);
+	pthreadpool_set_threads_count(threadpool.get(), 2);
 
 	struct array_addition_context context;
 	init_context(augend, addend, sum, thread_ids, num_threads, &context, ref_sum);
@@ -7510,8 +7510,8 @@ TEST(CapNumThreadsTest, RunUnderCapacitySetMultipleTimes1) {
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(num_threads), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
-	pthreadpool_set_num_threads_to_use(2);
-	pthreadpool_set_num_threads_to_use(3);
+	pthreadpool_set_threads_count(threadpool.get(), 2);
+	pthreadpool_set_threads_count(threadpool.get(), 3);
 
 	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
 		GTEST_SKIP();
@@ -7544,7 +7544,7 @@ TEST(CapNumThreadsTest, RunUnderCapacitySetMultipleTimes2) {
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(num_threads), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
-	pthreadpool_set_num_threads_to_use(2);
+	pthreadpool_set_threads_count(threadpool.get(), 2);
 
 	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
 		GTEST_SKIP();
@@ -7563,7 +7563,7 @@ TEST(CapNumThreadsTest, RunUnderCapacitySetMultipleTimes2) {
 	check_num_threads_used(thread_ids, num_threads, 2);
 
 	init_context(augend, addend, sum, thread_ids, num_threads, &context, ref_sum, 2.3);
-	pthreadpool_set_num_threads_to_use(3);
+	pthreadpool_set_threads_count(threadpool.get(), 3);
 
 	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
 		GTEST_SKIP();
@@ -7596,7 +7596,7 @@ TEST(CapNumThreadsTest, RunUnderCapacitySetMultipleTimes3) {
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(num_threads), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
-	pthreadpool_set_num_threads_to_use(1);
+	pthreadpool_set_threads_count(threadpool.get(), 1);
 
 	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
 		GTEST_SKIP();
@@ -7615,7 +7615,7 @@ TEST(CapNumThreadsTest, RunUnderCapacitySetMultipleTimes3) {
 	check_num_threads_used(thread_ids, num_threads, 1);
 
 	init_context(augend, addend, sum, thread_ids, num_threads, &context, ref_sum, 2.3);
-	pthreadpool_set_num_threads_to_use(4);
+	pthreadpool_set_threads_count(threadpool.get(), 4);
 
 	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
 		GTEST_SKIP();
@@ -7648,7 +7648,7 @@ TEST(CapNumThreadsTest, RunAtCapacity) {
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(num_threads), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
-	pthreadpool_set_num_threads_to_use(num_threads);
+	pthreadpool_set_threads_count(threadpool.get(), num_threads);
 
 	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
 		GTEST_SKIP();
@@ -7681,7 +7681,7 @@ TEST(CapNumThreadsTest, RunOverCapacity) {
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(num_threads), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
-	pthreadpool_set_num_threads_to_use(16);
+	pthreadpool_set_threads_count(threadpool.get(), 16);
 
 	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
 		GTEST_SKIP();
@@ -7714,7 +7714,7 @@ TEST(CapNumThreadsTest, RunSingleThreaded) {
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(num_threads), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
-	pthreadpool_set_num_threads_to_use(1);
+	pthreadpool_set_threads_count(threadpool.get(), 1);
 
 	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
 		GTEST_SKIP();

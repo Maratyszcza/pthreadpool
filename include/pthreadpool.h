@@ -83,26 +83,31 @@ pthreadpool_t pthreadpool_create(size_t threads_count);
  *
  * @returns  The number of threads in the thread pool.
  */
-size_t pthreadpool_get_threads_count(pthreadpool_t threadpool);
+size_t pthreadpool_get_max_threads_count(pthreadpool_t threadpool);
 
 /*
  * API to enable doing work with fewer threads than available in
  * threadpool.
+ * This API takes in a pointer to threadpool object and sets number
+ * of threads to use with that threadpool.
  * Purpose of this is to ameliorate some perf degradation observed
  * due to OS mapping a given set of threads to fewer cores.
  *
+ * @param  threadpool threadpool object.
  * @param  num_threads  num threads to use for the subsequent tasks
- *    submitted.
+ *    submitted using the threadpool object.
  */
-void pthreadpool_set_num_threads_to_use(size_t num_threads);
+void pthreadpool_set_threads_count(pthreadpool_t threadpool, size_t num_threads);
 
 /*
- * Query current setting of the number of threads to use
+ * API to get number of threads to be used via threadpool. This number
+ * can be different from the size of the threadpool. It may have been set
+ * by pthreadpool_set_threads_count.
  *
- * @returns  The number of threads to be used for the subsequent tasks
- *    submitted.
+ * @param  threadpool threadpool object.
+ * @returns number of threads used by threadpool.
  */
-size_t pthreadpool_get_num_threads_to_use(void);
+size_t pthreadpool_get_threads_count(pthreadpool_t threadpool);
 
 /**
  * Process items on a 1D grid.

@@ -60,7 +60,7 @@ struct PTHREADPOOL_CACHELINE_ALIGNED thread_info {
 	 */
 	pthreadpool_atomic_size_t range_length;
 	/**
-	 * Thread number in the 0..threads_count-1 range.
+	 * Thread number in the 0..max_threads_count-1 range.
 	 */
 	size_t thread_number;
 	/**
@@ -610,7 +610,6 @@ struct pthreadpool_6d_tile_2d_params {
 };
 
 struct PTHREADPOOL_CACHELINE_ALIGNED pthreadpool {
-#if !PTHREADPOOL_USE_GCD
 	/**
 	 * The number of threads that are processing an operation.
 	 */
@@ -621,8 +620,7 @@ struct PTHREADPOOL_CACHELINE_ALIGNED pthreadpool {
 	 * As per this change, this feature is not available in GCD based
 	 * pthreadpool
 	 */
-	pthreadpool_atomic_size_t num_threads_to_use;
-#endif
+	pthreadpool_atomic_size_t threads_count;
 #if PTHREADPOOL_USE_FUTEX
 	/**
 	 * Indicates if there are active threads.
@@ -715,7 +713,7 @@ struct PTHREADPOOL_CACHELINE_ALIGNED pthreadpool {
 	 * FXdiv divisor for the number of threads in the thread pool.
 	 * This struct never change after pthreadpool_create.
 	 */
-	struct fxdiv_divisor_size_t threads_count;
+	struct fxdiv_divisor_size_t max_threads_count;
 	/**
 	 * Thread information structures that immediately follow this structure.
 	 */
@@ -726,7 +724,7 @@ PTHREADPOOL_STATIC_ASSERT(sizeof(struct pthreadpool) % PTHREADPOOL_CACHELINE_SIZ
 	"pthreadpool structure must occupy an integer number of cache lines (64 bytes)");
 
 PTHREADPOOL_INTERNAL struct pthreadpool* pthreadpool_allocate(
-	size_t threads_count);
+	size_t max_threads_count);
 
 PTHREADPOOL_INTERNAL void pthreadpool_deallocate(
 	struct pthreadpool* threadpool);

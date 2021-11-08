@@ -73,19 +73,3 @@
 		#define PTHREADPOOL_INTERNAL
 	#endif
 #endif
-
-// ported from: https://stackoverflow.com/questions/18298280/how-to-declare-a-variable-as-thread-local-portably
-/* gcc doesn't know _Thread_local from C11 yet */
-#ifdef __GNUC__
-# define thread_local __thread
-/*
-// c11 standard already has thread_local specified
-// https://en.cppreference.com/w/c/thread/thread_local
-#elif __STDC_VERSION__ >= 201112L
-# define thread_local _Thread_local
-*/
-#elif defined(_MSC_VER)
-# define thread_local __declspec(thread)
-#else
-# error Cannot define thread_local
-#endif

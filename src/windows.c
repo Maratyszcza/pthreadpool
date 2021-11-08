@@ -22,8 +22,6 @@
 #include "threadpool-object.h"
 #include "threadpool-utils.h"
 
-thread_local size_t max_num_threads = UINT_MAX;
-
 static void checkin_worker_thread(struct pthreadpool* threadpool, uint32_t event_index) {
 	if (pthreadpool_decrement_fetch_acquire_release_size_t(&threadpool->active_threads) == 0) {
 		SetEvent(threadpool->completion_event[event_index]);
@@ -135,27 +133,27 @@ static DWORD WINAPI thread_main(LPVOID arg) {
 	return 0;
 }
 
-struct pthreadpool* pthreadpool_create(size_t threads_count) {
-	if (threads_count == 0) {
+struct pthreadpool* pthreadpool_create(size_t max_threads_count) {
+	if (max_threads_count == 0) {
 		SYSTEM_INFO system_info;
 		ZeroMemory(&system_info, sizeof(system_info));
 		GetSystemInfo(&system_info);
-		threads_count = (size_t) system_info.dwNumberOfProcessors;
+		max_threads_count = (size_t) system_info.dwNumberOfProcessors;
 	}
 
-	struct pthreadpool* threadpool = pthreadpool_allocate(threads_count);
+	struct pthreadpool* threadpool = pthreadpool_allocate(max_threads_count);
 	if (threadpool == NULL) {
 		return NULL;
 	}
-	threadpool->threads_count = fxdiv_init_size_t(threads_count);
-	pthreadpool_store_relaxed_size_t(&threadpool->num_threads_to_use, threads_count);
-	for (size_t tid = 0; tid < threads_count; tid++) {
+	threadpool->max_threads_count = fxdiv_init_size_t(max_threads_count);
+	pthreadpool_store_relaxed_size_t(&threadpool->threads_count, max_threads_count);
+	for (size_t tid = 0; tid < max_threads_count; tid++) {
 		threadpool->threads[tid].thread_number = tid;
 		threadpool->threads[tid].threadpool = threadpool;
 	}
 
 	/* Thread pool with a single thread computes everything on the caller thread. */
-	if (threads_count > 1) {
+	if (max_threads_count > 1) {
 		threadpool->execution_mutex = CreateMutexW(
 			NULL /* mutex attributes */,
 			FALSE /* initially owned */,
@@ -168,11 +166,11 @@ struct pthreadpool* pthreadpool_create(size_t threads_count) {
 				NULL /* name */);
 		}
 
-		pthreadpool_store_relaxed_size_t(&threadpool->active_threads, threads_count - 1 /* caller thread */);
+		pthreadpool_store_relaxed_size_t(&threadpool->active_threads, max_threads_count - 1 /* caller thread */);
 		pthreadpool_store_relaxed_size_t(&threadpool->completion_event_index, 0);
 
 		/* Caller thread serves as worker #0. Thus, we create system threads starting with worker #1. */
-		for (size_t tid = 1; tid < threads_count; tid++) {
+		for (size_t tid = 1; tid < max_threads_count; tid++) {
 			threadpool->threads[tid].thread_handle = CreateThread(
 				NULL /* thread attributes */,
 				0 /* stack size: default */,
@@ -195,12 +193,14 @@ struct pthreadpool* pthreadpool_create(size_t threads_count) {
 	return threadpool;
 }
 
-void pthreadpool_set_num_threads_to_use(size_t num_threads) {
-	max_num_threads = num_threads;
-}
-
-size_t pthreadpool_get_num_threads_to_use() {
-	return max_num_threads;
+void pthreadpool_set_threads_count(struct pthreadpool* threadpool, size_t num_threads) {
+	const DWORD wait_status = WaitForSingleObject(threadpool->execution_mutex, INFINITE);
+	assert(wait_status == WAIT_OBJECT_0);
+	const struct fxdiv_divisor_size_t max_threads_count = threadpool->max_threads_count;
+	const size_t num_threads_to_use = min(max_threads_count.value, num_threads);
+	pthreadpool_store_relaxed_size_t(&threadpool->threads_count, num_threads_to_use);
+	const BOOL release_mutex_status = ReleaseMutex(threadpool->execution_mutex);
+	assert(release_mutex_status != FALSE);
 }
 
 PTHREADPOOL_INTERNAL void pthreadpool_parallelize(
@@ -222,9 +222,8 @@ PTHREADPOOL_INTERNAL void pthreadpool_parallelize(
 	const DWORD wait_status = WaitForSingleObject(threadpool->execution_mutex, INFINITE);
 	assert(wait_status == WAIT_OBJECT_0);
 
-	const struct fxdiv_divisor_size_t threads_count = threadpool->threads_count;
-	size_t max_threads_to_use = pthreadpool_get_num_threads_to_use();
-	const struct fxdiv_divisor_size_t num_threads_to_use = fxdiv_init_size_t(min(threads_count.value, max_threads_to_use));
+	const struct fxdiv_divisor_size_t threads_count =
+		fxdiv_init_size_t(pthreadpool_load_relaxed_size_t(&threadpool->threads_count));
 
 	/* Setup global arguments */
 	pthreadpool_store_relaxed_void_p(&threadpool->thread_function, (void*) thread_function);
@@ -232,8 +231,7 @@ PTHREADPOOL_INTERNAL void pthreadpool_parallelize(
 	pthreadpool_store_relaxed_void_p(&threadpool->argument, context);
 	pthreadpool_store_relaxed_uint32_t(&threadpool->flags, flags);
 
-	pthreadpool_store_relaxed_size_t(&threadpool->active_threads, num_threads_to_use.value - 1 /* caller thread */);
-  pthreadpool_store_relaxed_size_t(&threadpool->num_threads_to_use, num_threads_to_use.value);
+	pthreadpool_store_relaxed_size_t(&threadpool->active_threads, threads_count.value - 1 /* caller thread */);
 
 	if (params_size != 0) {
 		CopyMemory(&threadpool->params, params, params_size);
@@ -241,9 +239,9 @@ PTHREADPOOL_INTERNAL void pthreadpool_parallelize(
 	}
 
 	/* Spread the work between threads */
-	const struct fxdiv_result_size_t range_params = fxdiv_divide_size_t(linear_range, num_threads_to_use);
+	const struct fxdiv_result_size_t range_params = fxdiv_divide_size_t(linear_range, threads_count);
 	size_t range_start = 0;
-	for (size_t tid = 0; tid < num_threads_to_use.value; tid++) {
+	for (size_t tid = 0; tid < threads_count.value; tid++) {
 		struct thread_info* thread = &threadpool->threads[tid];
 		const size_t range_length = range_params.quotient + (size_t) (tid < range_params.remainder);
 		const size_t range_end = range_start + range_length;
@@ -259,7 +257,7 @@ PTHREADPOOL_INTERNAL void pthreadpool_parallelize(
 	completion_event_index = completion_event_index ^ 1;
 	pthreadpool_store_relaxed_size_t(&threadpool->completion_event_index, completion_event_index);
 
-	for (size_t tid = 1; tid < num_threads_to_use.value; tid++) {
+	for (size_t tid = 1; tid < threads_count.value; tid++) {
 		/*
 		 * Update the threadpool command.
 		 * Imporantly, do it after initializing command parameters (range, task, argument, flags)
@@ -337,11 +335,11 @@ PTHREADPOOL_INTERNAL void pthreadpool_parallelize(
 
 void pthreadpool_destroy(struct pthreadpool* threadpool) {
 	if (threadpool != NULL) {
-		const size_t threads_count = threadpool->threads_count.value;
-		if (threads_count > 1) {
-			pthreadpool_store_relaxed_size_t(&threadpool->active_threads, threads_count - 1 /* caller thread */);
+		const size_t max_threads_count = threadpool->max_threads_count.value;
+		if (max_threads_count > 1) {
+			pthreadpool_store_relaxed_size_t(&threadpool->active_threads, max_threads_count - 1 /* caller thread */);
 
-			for (size_t tid = 1; tid < threads_count; tid++) {
+			for (size_t tid = 1; tid < max_threads_count; tid++) {
 				/*
 				 * Store the command with release semantics to guarantee that if a worker thread observes
 				 * the new command value, it also observes the updated active_threads values.
@@ -360,7 +358,7 @@ void pthreadpool_destroy(struct pthreadpool* threadpool) {
 			}
 
 			/* Wait until all threads return */
-			for (size_t tid = 1; tid < threads_count; tid++) {
+			for (size_t tid = 1; tid < max_threads_count; tid++) {
 				const HANDLE thread_handle = threadpool->threads[tid].thread_handle;
 				if (thread_handle != NULL) {
 					const DWORD wait_status = WaitForSingleObject(thread_handle, INFINITE);
