@@ -85,6 +85,25 @@ pthreadpool_t pthreadpool_create(size_t threads_count);
  */
 size_t pthreadpool_get_threads_count(pthreadpool_t threadpool);
 
+/*
+ * API to enable doing work with fewer threads than available in
+ * threadpool.
+ * Purpose of this is to ameliorate some perf degradation observed
+ * due to OS mapping a given set of threads to fewer cores.
+ *
+ * @param  num_threads  num threads to use for the subsequent tasks
+ *    submitted.
+ */
+void pthreadpool_set_num_threads_to_use(size_t num_threads);
+
+/*
+ * Query current setting of the number of threads to use
+ *
+ * @returns  The number of threads to be used for the subsequent tasks
+ *    submitted.
+ */
+size_t pthreadpool_get_num_threads_to_use(void);
+
 /**
  * Process items on a 1D grid.
  *

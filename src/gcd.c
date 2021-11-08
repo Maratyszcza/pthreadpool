@@ -21,6 +21,8 @@
 #include "threadpool-object.h"
 #include "threadpool-utils.h"
 
+thread_local size_t max_num_threads = UINT_MAX;
+
 static void thread_main(void* arg, size_t thread_index) {
 	struct pthreadpool* threadpool = (struct pthreadpool*) arg;
 	struct thread_info* thread = &threadpool->threads[thread_index];
@@ -62,6 +64,7 @@ struct pthreadpool* pthreadpool_create(size_t threads_count) {
 		return NULL;
 	}
 	threadpool->threads_count = fxdiv_init_size_t(threads_count);
+	pthreadpool_store_relaxed_size_t(&threadpool->num_threads_to_use, threads_count);
 	for (size_t tid = 0; tid < threads_count; tid++) {
 		threadpool->threads[tid].thread_number = tid;
 	}
@@ -71,6 +74,14 @@ struct pthreadpool* pthreadpool_create(size_t threads_count) {
 		threadpool->execution_semaphore = dispatch_semaphore_create(1);
 	}
 	return threadpool;
+}
+
+void pthreadpool_set_num_threads_to_use(size_t num_threads) {
+	max_num_threads = num_threads;
+}
+
+size_t pthreadpool_get_num_threads_to_use() {
+	return max_num_threads;
 }
 
 PTHREADPOOL_INTERNAL void pthreadpool_parallelize(
@@ -98,7 +109,8 @@ PTHREADPOOL_INTERNAL void pthreadpool_parallelize(
 	pthreadpool_store_relaxed_uint32_t(&threadpool->flags, flags);
 
 	/* Locking of completion_mutex not needed: readers are sleeping on command_condvar */
-	const struct fxdiv_divisor_size_t threads_count = threadpool->threads_count;
+	const struct fxdiv_divisor_size_t threads_count =
+		fxdiv_init_size_t(min(threadpool->threads_count.value, pthreadpool_get_num_threads_to_use()));
 
 	if (params_size != 0) {
 		memcpy(&threadpool->params, params, params_size);
