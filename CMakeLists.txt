@@ -1,7 +1,7 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.5 FATAL_ERROR)
 
 # ---[ Project
-PROJECT(pthreadpool C CXX)
+PROJECT(pthreadpool C)
 
 # ---[ Options.
 SET(PTHREADPOOL_LIBRARY_TYPE "default" CACHE STRING "Type of library (shared, static, or default) to build")
@@ -24,6 +24,10 @@ ENDIF()
 
 # ---[ CMake options
 INCLUDE(GNUInstallDirs)
+
+IF(PTHREADPOOL_BUILD_TESTS OR PTHREADPOOL_BUILD_BENCHMARKS)
+  ENABLE_LANGUAGE(CXX)
+ENDIF()
 
 IF(PTHREADPOOL_BUILD_TESTS)
   ENABLE_TESTING()
