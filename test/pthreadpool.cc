@@ -7,6 +7,16 @@
 #include <cstddef>
 #include <memory>
 
+#if PTHREADPOOL_USE_JOBS
+#include "base/test/task_environment.h"
+#endif
+
+class PthreadPoolTestBase : public ::testing::Test {
+#if PTHREADPOOL_USE_JOBS
+  base::test::TaskEnvironment task_environment;
+#endif
+};
+
 
 typedef std::unique_ptr<pthreadpool, decltype(&pthreadpool_destroy)> auto_pthreadpool_t;
 
@@ -97,28 +107,31 @@ const size_t kIncrementIterations6D = 3;
 const uint32_t kMaxUArchIndex = 0;
 const uint32_t kDefaultUArchIndex = 42;
 
+class CreateAndDestroy : public PthreadPoolTestBase {};
 
-TEST(CreateAndDestroy, NullThreadPool) {
+TEST_F(CreateAndDestroy, NullThreadPool) {
 	pthreadpool* threadpool = nullptr;
 	pthreadpool_destroy(threadpool);
 }
 
-TEST(CreateAndDestroy, SingleThreadPool) {
+TEST_F(CreateAndDestroy, SingleThreadPool) {
 	pthreadpool* threadpool = pthreadpool_create(1);
 	ASSERT_TRUE(threadpool);
 	pthreadpool_destroy(threadpool);
 }
 
-TEST(CreateAndDestroy, MultiThreadPool) {
+TEST_F(CreateAndDestroy, MultiThreadPool) {
 	pthreadpool* threadpool = pthreadpool_create(0);
 	ASSERT_TRUE(threadpool);
 	pthreadpool_destroy(threadpool);
 }
 
+class Parallelize1D : public PthreadPoolTestBase {};
+
 static void ComputeNothing1D(void*, size_t) {
 }
 
-TEST(Parallelize1D, SingleThreadPoolCompletes) {
+TEST_F(Parallelize1D, SingleThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -129,7 +142,7 @@ TEST(Parallelize1D, SingleThreadPoolCompletes) {
 		0 /* flags */);
 }
 
-TEST(Parallelize1D, MultiThreadPoolCompletes) {
+TEST_F(Parallelize1D, MultiThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -149,7 +162,7 @@ static void CheckBounds1D(void*, size_t i) {
 	EXPECT_LT(i, kParallelize1DRange);
 }
 
-TEST(Parallelize1D, SingleThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize1D, SingleThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -161,7 +174,7 @@ TEST(Parallelize1D, SingleThreadPoolAllItemsInBounds) {
 		0 /* flags */);
 }
 
-TEST(Parallelize1D, MultiThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize1D, MultiThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -181,7 +194,7 @@ static void SetTrue1D(std::atomic_bool* processed_indicators, size_t i) {
 	processed_indicators[i].store(true, std::memory_order_relaxed);
 }
 
-TEST(Parallelize1D, SingleThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize1D, SingleThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize1DRange);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -200,7 +213,7 @@ TEST(Parallelize1D, SingleThreadPoolAllItemsProcessed) {
 	}
 }
 
-TEST(Parallelize1D, MultiThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize1D, MultiThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize1DRange);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -227,7 +240,7 @@ static void Increment1D(std::atomic_int* processed_counters, size_t i) {
 	processed_counters[i].fetch_add(1, std::memory_order_relaxed);
 }
 
-TEST(Parallelize1D, SingleThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize1D, SingleThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize1DRange);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -246,7 +259,7 @@ TEST(Parallelize1D, SingleThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize1D, MultiThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize1D, MultiThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize1DRange);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -269,7 +282,7 @@ TEST(Parallelize1D, MultiThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize1D, SingleThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize1D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize1DRange);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -291,7 +304,7 @@ TEST(Parallelize1D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	}
 }
 
-TEST(Parallelize1D, MultiThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize1D, MultiThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize1DRange);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -321,7 +334,7 @@ static void IncrementSame1D(std::atomic_int* num_processed_items, size_t i) {
 	num_processed_items->fetch_add(1, std::memory_order_relaxed);
 }
 
-TEST(Parallelize1D, MultiThreadPoolHighContention) {
+TEST_F(Parallelize1D, MultiThreadPoolHighContention) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -350,7 +363,7 @@ static void WorkImbalance1D(std::atomic_int* num_processed_items, size_t i) {
 	}
 }
 
-TEST(Parallelize1D, MultiThreadPoolWorkStealing) {
+TEST_F(Parallelize1D, MultiThreadPoolWorkStealing) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -369,10 +382,12 @@ TEST(Parallelize1D, MultiThreadPoolWorkStealing) {
 	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize1DRange);
 }
 
+class Parallelize1DWithUArch : public PthreadPoolTestBase {};
+
 static void ComputeNothing1DWithUArch(void*, uint32_t, size_t) {
 }
 
-TEST(Parallelize1DWithUArch, SingleThreadPoolCompletes) {
+TEST_F(Parallelize1DWithUArch, SingleThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -385,7 +400,7 @@ TEST(Parallelize1DWithUArch, SingleThreadPoolCompletes) {
 		0 /* flags */);
 }
 
-TEST(Parallelize1DWithUArch, MultiThreadPoolCompletes) {
+TEST_F(Parallelize1DWithUArch, MultiThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -409,7 +424,7 @@ static void CheckUArch1DWithUArch(void*, uint32_t uarch_index, size_t) {
 	}
 }
 
-TEST(Parallelize1DWithUArch, SingleThreadPoolUArchInBounds) {
+TEST_F(Parallelize1DWithUArch, SingleThreadPoolUArchInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -422,7 +437,7 @@ TEST(Parallelize1DWithUArch, SingleThreadPoolUArchInBounds) {
 		0 /* flags */);
 }
 
-TEST(Parallelize1DWithUArch, MultiThreadPoolUArchInBounds) {
+TEST_F(Parallelize1DWithUArch, MultiThreadPoolUArchInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -444,7 +459,7 @@ static void CheckBounds1DWithUArch(void*, uint32_t, size_t i) {
 	EXPECT_LT(i, kParallelize1DRange);
 }
 
-TEST(Parallelize1DWithUArch, SingleThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize1DWithUArch, SingleThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -458,7 +473,7 @@ TEST(Parallelize1DWithUArch, SingleThreadPoolAllItemsInBounds) {
 		0 /* flags */);
 }
 
-TEST(Parallelize1DWithUArch, MultiThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize1DWithUArch, MultiThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -480,7 +495,7 @@ static void SetTrue1DWithUArch(std::atomic_bool* processed_indicators, uint32_t,
 	processed_indicators[i].store(true, std::memory_order_relaxed);
 }
 
-TEST(Parallelize1DWithUArch, SingleThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize1DWithUArch, SingleThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize1DRange);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -501,7 +516,7 @@ TEST(Parallelize1DWithUArch, SingleThreadPoolAllItemsProcessed) {
 	}
 }
 
-TEST(Parallelize1DWithUArch, MultiThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize1DWithUArch, MultiThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize1DRange);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -530,7 +545,7 @@ static void Increment1DWithUArch(std::atomic_int* processed_counters, uint32_t, 
 	processed_counters[i].fetch_add(1, std::memory_order_relaxed);
 }
 
-TEST(Parallelize1DWithUArch, SingleThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize1DWithUArch, SingleThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize1DRange);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -551,7 +566,7 @@ TEST(Parallelize1DWithUArch, SingleThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize1DWithUArch, MultiThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize1DWithUArch, MultiThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize1DRange);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -576,7 +591,7 @@ TEST(Parallelize1DWithUArch, MultiThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize1DWithUArch, SingleThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize1DWithUArch, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize1DRange);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -600,7 +615,7 @@ TEST(Parallelize1DWithUArch, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	}
 }
 
-TEST(Parallelize1DWithUArch, MultiThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize1DWithUArch, MultiThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize1DRange);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -632,7 +647,7 @@ static void IncrementSame1DWithUArch(std::atomic_int* num_processed_items, uint3
 	num_processed_items->fetch_add(1, std::memory_order_relaxed);
 }
 
-TEST(Parallelize1DWithUArch, MultiThreadPoolHighContention) {
+TEST_F(Parallelize1DWithUArch, MultiThreadPoolHighContention) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -663,7 +678,7 @@ static void WorkImbalance1DWithUArch(std::atomic_int* num_processed_items, uint3
 	}
 }
 
-TEST(Parallelize1DWithUArch, MultiThreadPoolWorkStealing) {
+TEST_F(Parallelize1DWithUArch, MultiThreadPoolWorkStealing) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -684,10 +699,12 @@ TEST(Parallelize1DWithUArch, MultiThreadPoolWorkStealing) {
 	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize1DRange);
 }
 
+class Parallelize1DTile1D : public PthreadPoolTestBase {};
+
 static void ComputeNothing1DTile1D(void*, size_t, size_t) {
 }
 
-TEST(Parallelize1DTile1D, SingleThreadPoolCompletes) {
+TEST_F(Parallelize1DTile1D, SingleThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -698,7 +715,7 @@ TEST(Parallelize1DTile1D, SingleThreadPoolCompletes) {
 		0 /* flags */);
 }
 
-TEST(Parallelize1DTile1D, MultiThreadPoolCompletes) {
+TEST_F(Parallelize1DTile1D, MultiThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -719,7 +736,7 @@ static void CheckBounds1DTile1D(void*, size_t start_i, size_t tile_i) {
 	EXPECT_LE(start_i + tile_i, kParallelize1DTile1DRange);
 }
 
-TEST(Parallelize1DTile1D, SingleThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize1DTile1D, SingleThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -731,7 +748,7 @@ TEST(Parallelize1DTile1D, SingleThreadPoolAllItemsInBounds) {
 		0 /* flags */);
 }
 
-TEST(Parallelize1DTile1D, MultiThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize1DTile1D, MultiThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -754,7 +771,7 @@ static void CheckTiling1DTile1D(void*, size_t start_i, size_t tile_i) {
 	EXPECT_EQ(tile_i, std::min<size_t>(kParallelize1DTile1DTile, kParallelize1DTile1DRange - start_i));
 }
 
-TEST(Parallelize1DTile1D, SingleThreadPoolUniformTiling) {
+TEST_F(Parallelize1DTile1D, SingleThreadPoolUniformTiling) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -766,7 +783,7 @@ TEST(Parallelize1DTile1D, SingleThreadPoolUniformTiling) {
 		0 /* flags */);
 }
 
-TEST(Parallelize1DTile1D, MultiThreadPoolUniformTiling) {
+TEST_F(Parallelize1DTile1D, MultiThreadPoolUniformTiling) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -788,7 +805,7 @@ static void SetTrue1DTile1D(std::atomic_bool* processed_indicators, size_t start
 	}
 }
 
-TEST(Parallelize1DTile1D, SingleThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize1DTile1D, SingleThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize1DTile1DRange);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -807,7 +824,7 @@ TEST(Parallelize1DTile1D, SingleThreadPoolAllItemsProcessed) {
 	}
 }
 
-TEST(Parallelize1DTile1D, MultiThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize1DTile1D, MultiThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize1DTile1DRange);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -836,7 +853,7 @@ static void Increment1DTile1D(std::atomic_int* processed_counters, size_t start_
 	}
 }
 
-TEST(Parallelize1DTile1D, SingleThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize1DTile1D, SingleThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize1DTile1DRange);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -855,7 +872,7 @@ TEST(Parallelize1DTile1D, SingleThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize1DTile1D, MultiThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize1DTile1D, MultiThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize1DTile1DRange);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -878,7 +895,7 @@ TEST(Parallelize1DTile1D, MultiThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize1DTile1D, SingleThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize1DTile1D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize1DTile1DRange);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -900,7 +917,7 @@ TEST(Parallelize1DTile1D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	}
 }
 
-TEST(Parallelize1DTile1D, MultiThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize1DTile1D, MultiThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize1DTile1DRange);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -932,7 +949,7 @@ static void IncrementSame1DTile1D(std::atomic_int* num_processed_items, size_t s
 	}
 }
 
-TEST(Parallelize1DTile1D, MultiThreadPoolHighContention) {
+TEST_F(Parallelize1DTile1D, MultiThreadPoolHighContention) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -961,7 +978,7 @@ static void WorkImbalance1DTile1D(std::atomic_int* num_processed_items, size_t s
 	}
 }
 
-TEST(Parallelize1DTile1D, MultiThreadPoolWorkStealing) {
+TEST_F(Parallelize1DTile1D, MultiThreadPoolWorkStealing) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -980,10 +997,12 @@ TEST(Parallelize1DTile1D, MultiThreadPoolWorkStealing) {
 	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize1DTile1DRange);
 }
 
+class Parallelize2D : public PthreadPoolTestBase {};
+
 static void ComputeNothing2D(void*, size_t, size_t) {
 }
 
-TEST(Parallelize2D, SingleThreadPoolCompletes) {
+TEST_F(Parallelize2D, SingleThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -994,7 +1013,7 @@ TEST(Parallelize2D, SingleThreadPoolCompletes) {
 		0 /* flags */);
 }
 
-TEST(Parallelize2D, MultiThreadPoolCompletes) {
+TEST_F(Parallelize2D, MultiThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -1015,7 +1034,7 @@ static void CheckBounds2D(void*, size_t i, size_t j) {
 	EXPECT_LT(j, kParallelize2DRangeJ);
 }
 
-TEST(Parallelize2D, SingleThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize2D, SingleThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -1027,7 +1046,7 @@ TEST(Parallelize2D, SingleThreadPoolAllItemsInBounds) {
 		0 /* flags */);
 }
 
-TEST(Parallelize2D, MultiThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize2D, MultiThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -1048,7 +1067,7 @@ static void SetTrue2D(std::atomic_bool* processed_indicators, size_t i, size_t j
 	processed_indicators[linear_idx].store(true, std::memory_order_relaxed);
 }
 
-TEST(Parallelize2D, SingleThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize2D, SingleThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize2DRangeI * kParallelize2DRangeJ);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -1070,7 +1089,7 @@ TEST(Parallelize2D, SingleThreadPoolAllItemsProcessed) {
 	}
 }
 
-TEST(Parallelize2D, MultiThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize2D, MultiThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize2DRangeI * kParallelize2DRangeJ);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -1101,7 +1120,7 @@ static void Increment2D(std::atomic_int* processed_counters, size_t i, size_t j)
 	processed_counters[linear_idx].fetch_add(1, std::memory_order_relaxed);
 }
 
-TEST(Parallelize2D, SingleThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize2D, SingleThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize2DRangeI * kParallelize2DRangeJ);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -1124,7 +1143,7 @@ TEST(Parallelize2D, SingleThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize2D, MultiThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize2D, MultiThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize2DRangeI * kParallelize2DRangeJ);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -1151,7 +1170,7 @@ TEST(Parallelize2D, MultiThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize2D, SingleThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize2D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize2DRangeI * kParallelize2DRangeJ);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -1177,7 +1196,7 @@ TEST(Parallelize2D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	}
 }
 
-TEST(Parallelize2D, MultiThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize2D, MultiThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize2DRangeI * kParallelize2DRangeJ);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -1211,7 +1230,7 @@ static void IncrementSame2D(std::atomic_int* num_processed_items, size_t i, size
 	num_processed_items->fetch_add(1, std::memory_order_relaxed);
 }
 
-TEST(Parallelize2D, MultiThreadPoolHighContention) {
+TEST_F(Parallelize2D, MultiThreadPoolHighContention) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -1240,7 +1259,7 @@ static void WorkImbalance2D(std::atomic_int* num_processed_items, size_t i, size
 	}
 }
 
-TEST(Parallelize2D, MultiThreadPoolWorkStealing) {
+TEST_F(Parallelize2D, MultiThreadPoolWorkStealing) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -1259,10 +1278,12 @@ TEST(Parallelize2D, MultiThreadPoolWorkStealing) {
 	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize2DRangeI * kParallelize2DRangeJ);
 }
 
+class Parallelize2DTile1D : public PthreadPoolTestBase {};
+
 static void ComputeNothing2DTile1D(void*, size_t, size_t, size_t) {
 }
 
-TEST(Parallelize2DTile1D, SingleThreadPoolCompletes) {
+TEST_F(Parallelize2DTile1D, SingleThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -1273,7 +1294,7 @@ TEST(Parallelize2DTile1D, SingleThreadPoolCompletes) {
 		0 /* flags */);
 }
 
-TEST(Parallelize2DTile1D, MultiThreadPoolCompletes) {
+TEST_F(Parallelize2DTile1D, MultiThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -1295,7 +1316,7 @@ static void CheckBounds2DTile1D(void*, size_t i, size_t start_j, size_t tile_j) 
 	EXPECT_LE(start_j + tile_j, kParallelize2DTile1DRangeJ);
 }
 
-TEST(Parallelize2DTile1D, SingleThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize2DTile1D, SingleThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -1307,7 +1328,7 @@ TEST(Parallelize2DTile1D, SingleThreadPoolAllItemsInBounds) {
 		0 /* flags */);
 }
 
-TEST(Parallelize2DTile1D, MultiThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize2DTile1D, MultiThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -1330,7 +1351,7 @@ static void CheckTiling2DTile1D(void*, size_t i, size_t start_j, size_t tile_j) 
 	EXPECT_EQ(tile_j, std::min<size_t>(kParallelize2DTile1DTileJ, kParallelize2DTile1DRangeJ - start_j));
 }
 
-TEST(Parallelize2DTile1D, SingleThreadPoolUniformTiling) {
+TEST_F(Parallelize2DTile1D, SingleThreadPoolUniformTiling) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -1342,7 +1363,7 @@ TEST(Parallelize2DTile1D, SingleThreadPoolUniformTiling) {
 		0 /* flags */);
 }
 
-TEST(Parallelize2DTile1D, MultiThreadPoolUniformTiling) {
+TEST_F(Parallelize2DTile1D, MultiThreadPoolUniformTiling) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -1365,7 +1386,7 @@ static void SetTrue2DTile1D(std::atomic_bool* processed_indicators, size_t i, si
 	}
 }
 
-TEST(Parallelize2DTile1D, SingleThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize2DTile1D, SingleThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize2DTile1DRangeI * kParallelize2DTile1DRangeJ);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -1387,7 +1408,7 @@ TEST(Parallelize2DTile1D, SingleThreadPoolAllItemsProcessed) {
 	}
 }
 
-TEST(Parallelize2DTile1D, MultiThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize2DTile1D, MultiThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize2DTile1DRangeI * kParallelize2DTile1DRangeJ);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -1420,7 +1441,7 @@ static void Increment2DTile1D(std::atomic_int* processed_counters, size_t i, siz
 	}
 }
 
-TEST(Parallelize2DTile1D, SingleThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize2DTile1D, SingleThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize2DTile1DRangeI * kParallelize2DTile1DRangeJ);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -1443,7 +1464,7 @@ TEST(Parallelize2DTile1D, SingleThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize2DTile1D, MultiThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize2DTile1D, MultiThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize2DTile1DRangeI * kParallelize2DTile1DRangeJ);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -1470,7 +1491,7 @@ TEST(Parallelize2DTile1D, MultiThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize2DTile1D, SingleThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize2DTile1D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize2DTile1DRangeI * kParallelize2DTile1DRangeJ);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -1496,7 +1517,7 @@ TEST(Parallelize2DTile1D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	}
 }
 
-TEST(Parallelize2DTile1D, MultiThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize2DTile1D, MultiThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize2DTile1DRangeI * kParallelize2DTile1DRangeJ);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -1532,7 +1553,7 @@ static void IncrementSame2DTile1D(std::atomic_int* num_processed_items, size_t i
 	}
 }
 
-TEST(Parallelize2DTile1D, MultiThreadPoolHighContention) {
+TEST_F(Parallelize2DTile1D, MultiThreadPoolHighContention) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -1561,7 +1582,7 @@ static void WorkImbalance2DTile1D(std::atomic_int* num_processed_items, size_t i
 	}
 }
 
-TEST(Parallelize2DTile1D, MultiThreadPoolWorkStealing) {
+TEST_F(Parallelize2DTile1D, MultiThreadPoolWorkStealing) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -1580,10 +1601,12 @@ TEST(Parallelize2DTile1D, MultiThreadPoolWorkStealing) {
 	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize2DTile1DRangeI * kParallelize2DTile1DRangeJ);
 }
 
+class Parallelize2DTile2D : public PthreadPoolTestBase {};
+
 static void ComputeNothing2DTile2D(void*, size_t, size_t, size_t, size_t) {
 }
 
-TEST(Parallelize2DTile2D, SingleThreadPoolCompletes) {
+TEST_F(Parallelize2DTile2D, SingleThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -1595,7 +1618,7 @@ TEST(Parallelize2DTile2D, SingleThreadPoolCompletes) {
 		0 /* flags */);
 }
 
-TEST(Parallelize2DTile2D, MultiThreadPoolCompletes) {
+TEST_F(Parallelize2DTile2D, MultiThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -1619,7 +1642,7 @@ static void CheckBounds2DTile2D(void*, size_t start_i, size_t start_j, size_t ti
 	EXPECT_LE(start_j + tile_j, kParallelize2DTile2DRangeJ);
 }
 
-TEST(Parallelize2DTile2D, SingleThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize2DTile2D, SingleThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -1632,7 +1655,7 @@ TEST(Parallelize2DTile2D, SingleThreadPoolAllItemsInBounds) {
 		0 /* flags */);
 }
 
-TEST(Parallelize2DTile2D, MultiThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize2DTile2D, MultiThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -1661,7 +1684,7 @@ static void CheckTiling2DTile2D(void*, size_t start_i, size_t start_j, size_t ti
 	EXPECT_EQ(tile_j, std::min<size_t>(kParallelize2DTile2DTileJ, kParallelize2DTile2DRangeJ - start_j));
 }
 
-TEST(Parallelize2DTile2D, SingleThreadPoolUniformTiling) {
+TEST_F(Parallelize2DTile2D, SingleThreadPoolUniformTiling) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -1674,7 +1697,7 @@ TEST(Parallelize2DTile2D, SingleThreadPoolUniformTiling) {
 		0 /* flags */);
 }
 
-TEST(Parallelize2DTile2D, MultiThreadPoolUniformTiling) {
+TEST_F(Parallelize2DTile2D, MultiThreadPoolUniformTiling) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -1700,7 +1723,7 @@ static void SetTrue2DTile2D(std::atomic_bool* processed_indicators, size_t start
 	}
 }
 
-TEST(Parallelize2DTile2D, SingleThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize2DTile2D, SingleThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize2DTile2DRangeI * kParallelize2DTile2DRangeJ);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -1723,7 +1746,7 @@ TEST(Parallelize2DTile2D, SingleThreadPoolAllItemsProcessed) {
 	}
 }
 
-TEST(Parallelize2DTile2D, MultiThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize2DTile2D, MultiThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize2DTile2DRangeI * kParallelize2DTile2DRangeJ);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -1759,7 +1782,7 @@ static void Increment2DTile2D(std::atomic_int* processed_counters, size_t start_
 	}
 }
 
-TEST(Parallelize2DTile2D, SingleThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize2DTile2D, SingleThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize2DTile2DRangeI * kParallelize2DTile2DRangeJ);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -1783,7 +1806,7 @@ TEST(Parallelize2DTile2D, SingleThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize2DTile2D, MultiThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize2DTile2D, MultiThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize2DTile2DRangeI * kParallelize2DTile2DRangeJ);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -1811,7 +1834,7 @@ TEST(Parallelize2DTile2D, MultiThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize2DTile2D, SingleThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize2DTile2D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize2DTile2DRangeI * kParallelize2DTile2DRangeJ);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -1838,7 +1861,7 @@ TEST(Parallelize2DTile2D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	}
 }
 
-TEST(Parallelize2DTile2D, MultiThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize2DTile2D, MultiThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize2DTile2DRangeI * kParallelize2DTile2DRangeJ);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -1877,7 +1900,7 @@ static void IncrementSame2DTile2D(std::atomic_int* num_processed_items, size_t s
 	}
 }
 
-TEST(Parallelize2DTile2D, MultiThreadPoolHighContention) {
+TEST_F(Parallelize2DTile2D, MultiThreadPoolHighContention) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -1907,7 +1930,7 @@ static void WorkImbalance2DTile2D(std::atomic_int* num_processed_items, size_t s
 	}
 }
 
-TEST(Parallelize2DTile2D, MultiThreadPoolWorkStealing) {
+TEST_F(Parallelize2DTile2D, MultiThreadPoolWorkStealing) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -1927,10 +1950,12 @@ TEST(Parallelize2DTile2D, MultiThreadPoolWorkStealing) {
 	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize2DTile2DRangeI * kParallelize2DTile2DRangeJ);
 }
 
+class Parallelize2DTile2DWithUArch : public PthreadPoolTestBase {};
+
 static void ComputeNothing2DTile2DWithUArch(void*, uint32_t, size_t, size_t, size_t, size_t) {
 }
 
-TEST(Parallelize2DTile2DWithUArch, SingleThreadPoolCompletes) {
+TEST_F(Parallelize2DTile2DWithUArch, SingleThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -1943,7 +1968,7 @@ TEST(Parallelize2DTile2DWithUArch, SingleThreadPoolCompletes) {
 		0 /* flags */);
 }
 
-TEST(Parallelize2DTile2DWithUArch, MultiThreadPoolCompletes) {
+TEST_F(Parallelize2DTile2DWithUArch, MultiThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -1967,7 +1992,7 @@ static void CheckUArch2DTile2DWithUArch(void*, uint32_t uarch_index, size_t, siz
 	}
 }
 
-TEST(Parallelize2DTile2DWithUArch, SingleThreadPoolUArchInBounds) {
+TEST_F(Parallelize2DTile2DWithUArch, SingleThreadPoolUArchInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -1981,7 +2006,7 @@ TEST(Parallelize2DTile2DWithUArch, SingleThreadPoolUArchInBounds) {
 		0 /* flags */);
 }
 
-TEST(Parallelize2DTile2DWithUArch, MultiThreadPoolUArchInBounds) {
+TEST_F(Parallelize2DTile2DWithUArch, MultiThreadPoolUArchInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -2006,7 +2031,7 @@ static void CheckBounds2DTile2DWithUArch(void*, uint32_t, size_t start_i, size_t
 	EXPECT_LE(start_j + tile_j, kParallelize2DTile2DRangeJ);
 }
 
-TEST(Parallelize2DTile2DWithUArch, SingleThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize2DTile2DWithUArch, SingleThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -2020,7 +2045,7 @@ TEST(Parallelize2DTile2DWithUArch, SingleThreadPoolAllItemsInBounds) {
 		0 /* flags */);
 }
 
-TEST(Parallelize2DTile2DWithUArch, MultiThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize2DTile2DWithUArch, MultiThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -2050,7 +2075,7 @@ static void CheckTiling2DTile2DWithUArch(void*, uint32_t, size_t start_i, size_t
 	EXPECT_EQ(tile_j, std::min<size_t>(kParallelize2DTile2DTileJ, kParallelize2DTile2DRangeJ - start_j));
 }
 
-TEST(Parallelize2DTile2DWithUArch, SingleThreadPoolUniformTiling) {
+TEST_F(Parallelize2DTile2DWithUArch, SingleThreadPoolUniformTiling) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -2064,7 +2089,7 @@ TEST(Parallelize2DTile2DWithUArch, SingleThreadPoolUniformTiling) {
 		0 /* flags */);
 }
 
-TEST(Parallelize2DTile2DWithUArch, MultiThreadPoolUniformTiling) {
+TEST_F(Parallelize2DTile2DWithUArch, MultiThreadPoolUniformTiling) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -2091,7 +2116,7 @@ static void SetTrue2DTile2DWithUArch(std::atomic_bool* processed_indicators, uin
 	}
 }
 
-TEST(Parallelize2DTile2DWithUArch, SingleThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize2DTile2DWithUArch, SingleThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize2DTile2DRangeI * kParallelize2DTile2DRangeJ);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -2115,7 +2140,7 @@ TEST(Parallelize2DTile2DWithUArch, SingleThreadPoolAllItemsProcessed) {
 	}
 }
 
-TEST(Parallelize2DTile2DWithUArch, MultiThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize2DTile2DWithUArch, MultiThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize2DTile2DRangeI * kParallelize2DTile2DRangeJ);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -2152,7 +2177,7 @@ static void Increment2DTile2DWithUArch(std::atomic_int* processed_counters, uint
 	}
 }
 
-TEST(Parallelize2DTile2DWithUArch, SingleThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize2DTile2DWithUArch, SingleThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize2DTile2DRangeI * kParallelize2DTile2DRangeJ);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -2177,7 +2202,7 @@ TEST(Parallelize2DTile2DWithUArch, SingleThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize2DTile2DWithUArch, MultiThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize2DTile2DWithUArch, MultiThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize2DTile2DRangeI * kParallelize2DTile2DRangeJ);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -2206,7 +2231,7 @@ TEST(Parallelize2DTile2DWithUArch, MultiThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize2DTile2DWithUArch, SingleThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize2DTile2DWithUArch, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize2DTile2DRangeI * kParallelize2DTile2DRangeJ);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -2234,7 +2259,7 @@ TEST(Parallelize2DTile2DWithUArch, SingleThreadPoolEachItemProcessedMultipleTime
 	}
 }
 
-TEST(Parallelize2DTile2DWithUArch, MultiThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize2DTile2DWithUArch, MultiThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize2DTile2DRangeI * kParallelize2DTile2DRangeJ);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -2274,7 +2299,7 @@ static void IncrementSame2DTile2DWithUArch(std::atomic_int* num_processed_items,
 	}
 }
 
-TEST(Parallelize2DTile2DWithUArch, MultiThreadPoolHighContention) {
+TEST_F(Parallelize2DTile2DWithUArch, MultiThreadPoolHighContention) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -2305,7 +2330,7 @@ static void WorkImbalance2DTile2DWithUArch(std::atomic_int* num_processed_items,
 	}
 }
 
-TEST(Parallelize2DTile2DWithUArch, MultiThreadPoolWorkStealing) {
+TEST_F(Parallelize2DTile2DWithUArch, MultiThreadPoolWorkStealing) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -2326,10 +2351,12 @@ TEST(Parallelize2DTile2DWithUArch, MultiThreadPoolWorkStealing) {
 	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize2DTile2DRangeI * kParallelize2DTile2DRangeJ);
 }
 
+class Parallelize3D : public PthreadPoolTestBase {};
+
 static void ComputeNothing3D(void*, size_t, size_t, size_t) {
 }
 
-TEST(Parallelize3D, SingleThreadPoolCompletes) {
+TEST_F(Parallelize3D, SingleThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -2340,7 +2367,7 @@ TEST(Parallelize3D, SingleThreadPoolCompletes) {
 		0 /* flags */);
 }
 
-TEST(Parallelize3D, MultiThreadPoolCompletes) {
+TEST_F(Parallelize3D, MultiThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -2362,7 +2389,7 @@ static void CheckBounds3D(void*, size_t i, size_t j, size_t k) {
 	EXPECT_LT(k, kParallelize3DRangeK);
 }
 
-TEST(Parallelize3D, SingleThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize3D, SingleThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -2374,7 +2401,7 @@ TEST(Parallelize3D, SingleThreadPoolAllItemsInBounds) {
 		0 /* flags */);
 }
 
-TEST(Parallelize3D, MultiThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize3D, MultiThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -2395,7 +2422,7 @@ static void SetTrue3D(std::atomic_bool* processed_indicators, size_t i, size_t j
 	processed_indicators[linear_idx].store(true, std::memory_order_relaxed);
 }
 
-TEST(Parallelize3D, SingleThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize3D, SingleThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize3DRangeI * kParallelize3DRangeJ * kParallelize3DRangeK);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -2419,7 +2446,7 @@ TEST(Parallelize3D, SingleThreadPoolAllItemsProcessed) {
 	}
 }
 
-TEST(Parallelize3D, MultiThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize3D, MultiThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize3DRangeI * kParallelize3DRangeJ * kParallelize3DRangeK);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -2452,7 +2479,7 @@ static void Increment3D(std::atomic_int* processed_counters, size_t i, size_t j,
 	processed_counters[linear_idx].fetch_add(1, std::memory_order_relaxed);
 }
 
-TEST(Parallelize3D, SingleThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize3D, SingleThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize3DRangeI * kParallelize3DRangeJ * kParallelize3DRangeK);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -2477,7 +2504,7 @@ TEST(Parallelize3D, SingleThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize3D, MultiThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize3D, MultiThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize3DRangeI * kParallelize3DRangeJ * kParallelize3DRangeK);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -2506,7 +2533,7 @@ TEST(Parallelize3D, MultiThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize3D, SingleThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize3D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize3DRangeI * kParallelize3DRangeJ * kParallelize3DRangeK);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -2534,7 +2561,7 @@ TEST(Parallelize3D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	}
 }
 
-TEST(Parallelize3D, MultiThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize3D, MultiThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize3DRangeI * kParallelize3DRangeJ * kParallelize3DRangeK);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -2570,7 +2597,7 @@ static void IncrementSame3D(std::atomic_int* num_processed_items, size_t i, size
 	num_processed_items->fetch_add(1, std::memory_order_relaxed);
 }
 
-TEST(Parallelize3D, MultiThreadPoolHighContention) {
+TEST_F(Parallelize3D, MultiThreadPoolHighContention) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -2599,7 +2626,7 @@ static void WorkImbalance3D(std::atomic_int* num_processed_items, size_t i, size
 	}
 }
 
-TEST(Parallelize3D, MultiThreadPoolWorkStealing) {
+TEST_F(Parallelize3D, MultiThreadPoolWorkStealing) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -2618,10 +2645,12 @@ TEST(Parallelize3D, MultiThreadPoolWorkStealing) {
 	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize3DRangeI * kParallelize3DRangeJ * kParallelize3DRangeK);
 }
 
+class Parallelize3DTile1D : public PthreadPoolTestBase {};
+
 static void ComputeNothing3DTile1D(void*, size_t, size_t, size_t, size_t) {
 }
 
-TEST(Parallelize3DTile1D, SingleThreadPoolCompletes) {
+TEST_F(Parallelize3DTile1D, SingleThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -2633,7 +2662,7 @@ TEST(Parallelize3DTile1D, SingleThreadPoolCompletes) {
 		0 /* flags */);
 }
 
-TEST(Parallelize3DTile1D, MultiThreadPoolCompletes) {
+TEST_F(Parallelize3DTile1D, MultiThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -2657,7 +2686,7 @@ static void CheckBounds3DTile1D(void*, size_t i, size_t j, size_t start_k, size_
 	EXPECT_LE(start_k + tile_k, kParallelize3DTile1DRangeK);
 }
 
-TEST(Parallelize3DTile1D, SingleThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize3DTile1D, SingleThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -2670,7 +2699,7 @@ TEST(Parallelize3DTile1D, SingleThreadPoolAllItemsInBounds) {
 		0 /* flags */);
 }
 
-TEST(Parallelize3DTile1D, MultiThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize3DTile1D, MultiThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -2694,7 +2723,7 @@ static void CheckTiling3DTile1D(void*, size_t i, size_t j, size_t start_k, size_
 	EXPECT_EQ(tile_k, std::min<size_t>(kParallelize3DTile1DTileK, kParallelize3DTile1DRangeK - start_k));
 }
 
-TEST(Parallelize3DTile1D, SingleThreadPoolUniformTiling) {
+TEST_F(Parallelize3DTile1D, SingleThreadPoolUniformTiling) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -2707,7 +2736,7 @@ TEST(Parallelize3DTile1D, SingleThreadPoolUniformTiling) {
 		0 /* flags */);
 }
 
-TEST(Parallelize3DTile1D, MultiThreadPoolUniformTiling) {
+TEST_F(Parallelize3DTile1D, MultiThreadPoolUniformTiling) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -2731,7 +2760,7 @@ static void SetTrue3DTile1D(std::atomic_bool* processed_indicators, size_t i, si
 	}
 }
 
-TEST(Parallelize3DTile1D, SingleThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize3DTile1D, SingleThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize3DTile1DRangeI * kParallelize3DTile1DRangeJ * kParallelize3DTile1DRangeK);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -2756,7 +2785,7 @@ TEST(Parallelize3DTile1D, SingleThreadPoolAllItemsProcessed) {
 	}
 }
 
-TEST(Parallelize3DTile1D, MultiThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize3DTile1D, MultiThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize3DTile1DRangeI * kParallelize3DTile1DRangeJ * kParallelize3DTile1DRangeK);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -2792,7 +2821,7 @@ static void Increment3DTile1D(std::atomic_int* processed_counters, size_t i, siz
 	}
 }
 
-TEST(Parallelize3DTile1D, SingleThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize3DTile1D, SingleThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize3DTile1DRangeI * kParallelize3DTile1DRangeJ * kParallelize3DTile1DRangeK);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -2818,7 +2847,7 @@ TEST(Parallelize3DTile1D, SingleThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize3DTile1D, MultiThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize3DTile1D, MultiThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize3DTile1DRangeI * kParallelize3DTile1DRangeJ * kParallelize3DTile1DRangeK);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -2848,7 +2877,7 @@ TEST(Parallelize3DTile1D, MultiThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize3DTile1D, SingleThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize3DTile1D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize3DTile1DRangeI * kParallelize3DTile1DRangeJ * kParallelize3DTile1DRangeK);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -2877,7 +2906,7 @@ TEST(Parallelize3DTile1D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	}
 }
 
-TEST(Parallelize3DTile1D, MultiThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize3DTile1D, MultiThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize3DTile1DRangeI * kParallelize3DTile1DRangeJ * kParallelize3DTile1DRangeK);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -2916,7 +2945,7 @@ static void IncrementSame3DTile1D(std::atomic_int* num_processed_items, size_t i
 	}
 }
 
-TEST(Parallelize3DTile1D, MultiThreadPoolHighContention) {
+TEST_F(Parallelize3DTile1D, MultiThreadPoolHighContention) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -2946,7 +2975,7 @@ static void WorkImbalance3DTile1D(std::atomic_int* num_processed_items, size_t i
 	}
 }
 
-TEST(Parallelize3DTile1D, MultiThreadPoolWorkStealing) {
+TEST_F(Parallelize3DTile1D, MultiThreadPoolWorkStealing) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -2966,10 +2995,12 @@ TEST(Parallelize3DTile1D, MultiThreadPoolWorkStealing) {
 	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize3DTile1DRangeI * kParallelize3DTile1DRangeJ * kParallelize3DTile1DRangeK);
 }
 
+class Parallelize3DTile2D : public PthreadPoolTestBase {};
+
 static void ComputeNothing3DTile2D(void*, size_t, size_t, size_t, size_t, size_t) {
 }
 
-TEST(Parallelize3DTile2D, SingleThreadPoolCompletes) {
+TEST_F(Parallelize3DTile2D, SingleThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -2981,7 +3012,7 @@ TEST(Parallelize3DTile2D, SingleThreadPoolCompletes) {
 		0 /* flags */);
 }
 
-TEST(Parallelize3DTile2D, MultiThreadPoolCompletes) {
+TEST_F(Parallelize3DTile2D, MultiThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -3006,7 +3037,7 @@ static void CheckBounds3DTile2D(void*, size_t i, size_t start_j, size_t start_k,
 	EXPECT_LE(start_k + tile_k, kParallelize3DTile2DRangeK);
 }
 
-TEST(Parallelize3DTile2D, SingleThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize3DTile2D, SingleThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -3019,7 +3050,7 @@ TEST(Parallelize3DTile2D, SingleThreadPoolAllItemsInBounds) {
 		0 /* flags */);
 }
 
-TEST(Parallelize3DTile2D, MultiThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize3DTile2D, MultiThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -3048,7 +3079,7 @@ static void CheckTiling3DTile2D(void*, size_t i, size_t start_j, size_t start_k,
 	EXPECT_EQ(tile_k, std::min<size_t>(kParallelize3DTile2DTileK, kParallelize3DTile2DRangeK - start_k));
 }
 
-TEST(Parallelize3DTile2D, SingleThreadPoolUniformTiling) {
+TEST_F(Parallelize3DTile2D, SingleThreadPoolUniformTiling) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -3061,7 +3092,7 @@ TEST(Parallelize3DTile2D, SingleThreadPoolUniformTiling) {
 		0 /* flags */);
 }
 
-TEST(Parallelize3DTile2D, MultiThreadPoolUniformTiling) {
+TEST_F(Parallelize3DTile2D, MultiThreadPoolUniformTiling) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -3087,7 +3118,7 @@ static void SetTrue3DTile2D(std::atomic_bool* processed_indicators, size_t i, si
 	}
 }
 
-TEST(Parallelize3DTile2D, SingleThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize3DTile2D, SingleThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize3DTile2DRangeI * kParallelize3DTile2DRangeJ * kParallelize3DTile2DRangeK);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -3112,7 +3143,7 @@ TEST(Parallelize3DTile2D, SingleThreadPoolAllItemsProcessed) {
 	}
 }
 
-TEST(Parallelize3DTile2D, MultiThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize3DTile2D, MultiThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize3DTile2DRangeI * kParallelize3DTile2DRangeJ * kParallelize3DTile2DRangeK);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -3150,7 +3181,7 @@ static void Increment3DTile2D(std::atomic_int* processed_counters, size_t i, siz
 	}
 }
 
-TEST(Parallelize3DTile2D, SingleThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize3DTile2D, SingleThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize3DTile2DRangeI * kParallelize3DTile2DRangeJ * kParallelize3DTile2DRangeK);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -3176,7 +3207,7 @@ TEST(Parallelize3DTile2D, SingleThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize3DTile2D, MultiThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize3DTile2D, MultiThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize3DTile2DRangeI * kParallelize3DTile2DRangeJ * kParallelize3DTile2DRangeK);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -3206,7 +3237,7 @@ TEST(Parallelize3DTile2D, MultiThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize3DTile2D, SingleThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize3DTile2D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize3DTile2DRangeI * kParallelize3DTile2DRangeJ * kParallelize3DTile2DRangeK);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -3235,7 +3266,7 @@ TEST(Parallelize3DTile2D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	}
 }
 
-TEST(Parallelize3DTile2D, MultiThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize3DTile2D, MultiThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize3DTile2DRangeI * kParallelize3DTile2DRangeJ * kParallelize3DTile2DRangeK);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -3276,7 +3307,7 @@ static void IncrementSame3DTile2D(std::atomic_int* num_processed_items, size_t i
 	}
 }
 
-TEST(Parallelize3DTile2D, MultiThreadPoolHighContention) {
+TEST_F(Parallelize3DTile2D, MultiThreadPoolHighContention) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -3306,7 +3337,7 @@ static void WorkImbalance3DTile2D(std::atomic_int* num_processed_items, size_t i
 	}
 }
 
-TEST(Parallelize3DTile2D, MultiThreadPoolWorkStealing) {
+TEST_F(Parallelize3DTile2D, MultiThreadPoolWorkStealing) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -3326,10 +3357,12 @@ TEST(Parallelize3DTile2D, MultiThreadPoolWorkStealing) {
 	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize3DTile2DRangeI * kParallelize3DTile2DRangeJ * kParallelize3DTile2DRangeK);
 }
 
+class Parallelize3DTile2DWithUArch : public PthreadPoolTestBase {};
+
 static void ComputeNothing3DTile2DWithUArch(void*, uint32_t, size_t, size_t, size_t, size_t, size_t) {
 }
 
-TEST(Parallelize3DTile2DWithUArch, SingleThreadPoolCompletes) {
+TEST_F(Parallelize3DTile2DWithUArch, SingleThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -3342,7 +3375,7 @@ TEST(Parallelize3DTile2DWithUArch, SingleThreadPoolCompletes) {
 		0 /* flags */);
 }
 
-TEST(Parallelize3DTile2DWithUArch, MultiThreadPoolCompletes) {
+TEST_F(Parallelize3DTile2DWithUArch, MultiThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -3366,7 +3399,7 @@ static void CheckUArch3DTile2DWithUArch(void*, uint32_t uarch_index, size_t, siz
 	}
 }
 
-TEST(Parallelize3DTile2DWithUArch, SingleThreadPoolUArchInBounds) {
+TEST_F(Parallelize3DTile2DWithUArch, SingleThreadPoolUArchInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -3380,7 +3413,7 @@ TEST(Parallelize3DTile2DWithUArch, SingleThreadPoolUArchInBounds) {
 		0 /* flags */);
 }
 
-TEST(Parallelize3DTile2DWithUArch, MultiThreadPoolUArchInBounds) {
+TEST_F(Parallelize3DTile2DWithUArch, MultiThreadPoolUArchInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -3406,7 +3439,7 @@ static void CheckBounds3DTile2DWithUArch(void*, uint32_t, size_t i, size_t start
 	EXPECT_LE(start_k + tile_k, kParallelize3DTile2DRangeK);
 }
 
-TEST(Parallelize3DTile2DWithUArch, SingleThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize3DTile2DWithUArch, SingleThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -3420,7 +3453,7 @@ TEST(Parallelize3DTile2DWithUArch, SingleThreadPoolAllItemsInBounds) {
 		0 /* flags */);
 }
 
-TEST(Parallelize3DTile2DWithUArch, MultiThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize3DTile2DWithUArch, MultiThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -3450,7 +3483,7 @@ static void CheckTiling3DTile2DWithUArch(void*, uint32_t, size_t i, size_t start
 	EXPECT_EQ(tile_k, std::min<size_t>(kParallelize3DTile2DTileK, kParallelize3DTile2DRangeK - start_k));
 }
 
-TEST(Parallelize3DTile2DWithUArch, SingleThreadPoolUniformTiling) {
+TEST_F(Parallelize3DTile2DWithUArch, SingleThreadPoolUniformTiling) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -3464,7 +3497,7 @@ TEST(Parallelize3DTile2DWithUArch, SingleThreadPoolUniformTiling) {
 		0 /* flags */);
 }
 
-TEST(Parallelize3DTile2DWithUArch, MultiThreadPoolUniformTiling) {
+TEST_F(Parallelize3DTile2DWithUArch, MultiThreadPoolUniformTiling) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -3491,7 +3524,7 @@ static void SetTrue3DTile2DWithUArch(std::atomic_bool* processed_indicators, uin
 	}
 }
 
-TEST(Parallelize3DTile2DWithUArch, SingleThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize3DTile2DWithUArch, SingleThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize3DTile2DRangeI * kParallelize3DTile2DRangeJ * kParallelize3DTile2DRangeK);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -3517,7 +3550,7 @@ TEST(Parallelize3DTile2DWithUArch, SingleThreadPoolAllItemsProcessed) {
 	}
 }
 
-TEST(Parallelize3DTile2DWithUArch, MultiThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize3DTile2DWithUArch, MultiThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize3DTile2DRangeI * kParallelize3DTile2DRangeJ * kParallelize3DTile2DRangeK);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -3556,7 +3589,7 @@ static void Increment3DTile2DWithUArch(std::atomic_int* processed_counters, uint
 	}
 }
 
-TEST(Parallelize3DTile2DWithUArch, SingleThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize3DTile2DWithUArch, SingleThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize3DTile2DRangeI * kParallelize3DTile2DRangeJ * kParallelize3DTile2DRangeK);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -3583,7 +3616,7 @@ TEST(Parallelize3DTile2DWithUArch, SingleThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize3DTile2DWithUArch, MultiThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize3DTile2DWithUArch, MultiThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize3DTile2DRangeI * kParallelize3DTile2DRangeJ * kParallelize3DTile2DRangeK);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -3614,7 +3647,7 @@ TEST(Parallelize3DTile2DWithUArch, MultiThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize3DTile2DWithUArch, SingleThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize3DTile2DWithUArch, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize3DTile2DRangeI * kParallelize3DTile2DRangeJ * kParallelize3DTile2DRangeK);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -3644,7 +3677,7 @@ TEST(Parallelize3DTile2DWithUArch, SingleThreadPoolEachItemProcessedMultipleTime
 	}
 }
 
-TEST(Parallelize3DTile2DWithUArch, MultiThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize3DTile2DWithUArch, MultiThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize3DTile2DRangeI * kParallelize3DTile2DRangeJ * kParallelize3DTile2DRangeK);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -3686,7 +3719,7 @@ static void IncrementSame3DTile2DWithUArch(std::atomic_int* num_processed_items,
 	}
 }
 
-TEST(Parallelize3DTile2DWithUArch, MultiThreadPoolHighContention) {
+TEST_F(Parallelize3DTile2DWithUArch, MultiThreadPoolHighContention) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -3717,7 +3750,7 @@ static void WorkImbalance3DTile2DWithUArch(std::atomic_int* num_processed_items,
 	}
 }
 
-TEST(Parallelize3DTile2DWithUArch, MultiThreadPoolWorkStealing) {
+TEST_F(Parallelize3DTile2DWithUArch, MultiThreadPoolWorkStealing) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -3738,10 +3771,12 @@ TEST(Parallelize3DTile2DWithUArch, MultiThreadPoolWorkStealing) {
 	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize3DTile2DRangeI * kParallelize3DTile2DRangeJ * kParallelize3DTile2DRangeK);
 }
 
+class Parallelize4D : public PthreadPoolTestBase {};
+
 static void ComputeNothing4D(void*, size_t, size_t, size_t, size_t) {
 }
 
-TEST(Parallelize4D, SingleThreadPoolCompletes) {
+TEST_F(Parallelize4D, SingleThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -3752,7 +3787,7 @@ TEST(Parallelize4D, SingleThreadPoolCompletes) {
 		0 /* flags */);
 }
 
-TEST(Parallelize4D, MultiThreadPoolCompletes) {
+TEST_F(Parallelize4D, MultiThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -3775,7 +3810,7 @@ static void CheckBounds4D(void*, size_t i, size_t j, size_t k, size_t l) {
 	EXPECT_LT(l, kParallelize4DRangeL);
 }
 
-TEST(Parallelize4D, SingleThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize4D, SingleThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -3787,7 +3822,7 @@ TEST(Parallelize4D, SingleThreadPoolAllItemsInBounds) {
 		0 /* flags */);
 }
 
-TEST(Parallelize4D, MultiThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize4D, MultiThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -3808,7 +3843,7 @@ static void SetTrue4D(std::atomic_bool* processed_indicators, size_t i, size_t j
 	processed_indicators[linear_idx].store(true, std::memory_order_relaxed);
 }
 
-TEST(Parallelize4D, SingleThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize4D, SingleThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize4DRangeI * kParallelize4DRangeJ * kParallelize4DRangeK * kParallelize4DRangeL);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -3834,7 +3869,7 @@ TEST(Parallelize4D, SingleThreadPoolAllItemsProcessed) {
 	}
 }
 
-TEST(Parallelize4D, MultiThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize4D, MultiThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize4DRangeI * kParallelize4DRangeJ * kParallelize4DRangeK * kParallelize4DRangeL);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -3869,7 +3904,7 @@ static void Increment4D(std::atomic_int* processed_counters, size_t i, size_t j,
 	processed_counters[linear_idx].fetch_add(1, std::memory_order_relaxed);
 }
 
-TEST(Parallelize4D, SingleThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize4D, SingleThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize4DRangeI * kParallelize4DRangeJ * kParallelize4DRangeK * kParallelize4DRangeL);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -3896,7 +3931,7 @@ TEST(Parallelize4D, SingleThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize4D, MultiThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize4D, MultiThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize4DRangeI * kParallelize4DRangeJ * kParallelize4DRangeK * kParallelize4DRangeL);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -3927,7 +3962,7 @@ TEST(Parallelize4D, MultiThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize4D, SingleThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize4D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize4DRangeI * kParallelize4DRangeJ * kParallelize4DRangeK * kParallelize4DRangeL);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -3957,7 +3992,7 @@ TEST(Parallelize4D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	}
 }
 
-TEST(Parallelize4D, MultiThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize4D, MultiThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize4DRangeI * kParallelize4DRangeJ * kParallelize4DRangeK * kParallelize4DRangeL);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -3995,7 +4030,7 @@ static void IncrementSame4D(std::atomic_int* num_processed_items, size_t i, size
 	num_processed_items->fetch_add(1, std::memory_order_relaxed);
 }
 
-TEST(Parallelize4D, MultiThreadPoolHighContention) {
+TEST_F(Parallelize4D, MultiThreadPoolHighContention) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -4024,7 +4059,7 @@ static void WorkImbalance4D(std::atomic_int* num_processed_items, size_t i, size
 	}
 }
 
-TEST(Parallelize4D, MultiThreadPoolWorkStealing) {
+TEST_F(Parallelize4D, MultiThreadPoolWorkStealing) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -4043,10 +4078,12 @@ TEST(Parallelize4D, MultiThreadPoolWorkStealing) {
 	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize4DRangeI * kParallelize4DRangeJ * kParallelize4DRangeK * kParallelize4DRangeL);
 }
 
+class Parallelize4DTile1D : public PthreadPoolTestBase {};
+
 static void ComputeNothing4DTile1D(void*, size_t, size_t, size_t, size_t, size_t) {
 }
 
-TEST(Parallelize4DTile1D, SingleThreadPoolCompletes) {
+TEST_F(Parallelize4DTile1D, SingleThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -4058,7 +4095,7 @@ TEST(Parallelize4DTile1D, SingleThreadPoolCompletes) {
 		0 /* flags */);
 }
 
-TEST(Parallelize4DTile1D, MultiThreadPoolCompletes) {
+TEST_F(Parallelize4DTile1D, MultiThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -4083,7 +4120,7 @@ static void CheckBounds4DTile1D(void*, size_t i, size_t j, size_t k, size_t star
 	EXPECT_LE(start_l + tile_l, kParallelize4DTile1DRangeL);
 }
 
-TEST(Parallelize4DTile1D, SingleThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize4DTile1D, SingleThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -4096,7 +4133,7 @@ TEST(Parallelize4DTile1D, SingleThreadPoolAllItemsInBounds) {
 		0 /* flags */);
 }
 
-TEST(Parallelize4DTile1D, MultiThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize4DTile1D, MultiThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -4120,7 +4157,7 @@ static void CheckTiling4DTile1D(void*, size_t i, size_t j, size_t k, size_t star
 	EXPECT_EQ(tile_l, std::min<size_t>(kParallelize4DTile1DTileL, kParallelize4DTile1DRangeL - start_l));
 }
 
-TEST(Parallelize4DTile1D, SingleThreadPoolUniformTiling) {
+TEST_F(Parallelize4DTile1D, SingleThreadPoolUniformTiling) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -4133,7 +4170,7 @@ TEST(Parallelize4DTile1D, SingleThreadPoolUniformTiling) {
 		0 /* flags */);
 }
 
-TEST(Parallelize4DTile1D, MultiThreadPoolUniformTiling) {
+TEST_F(Parallelize4DTile1D, MultiThreadPoolUniformTiling) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -4157,7 +4194,7 @@ static void SetTrue4DTile1D(std::atomic_bool* processed_indicators, size_t i, si
 	}
 }
 
-TEST(Parallelize4DTile1D, SingleThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize4DTile1D, SingleThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize4DTile1DRangeI * kParallelize4DTile1DRangeJ * kParallelize4DTile1DRangeK * kParallelize4DTile1DRangeL);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -4184,7 +4221,7 @@ TEST(Parallelize4DTile1D, SingleThreadPoolAllItemsProcessed) {
 	}
 }
 
-TEST(Parallelize4DTile1D, MultiThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize4DTile1D, MultiThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize4DTile1DRangeI * kParallelize4DTile1DRangeJ * kParallelize4DTile1DRangeK * kParallelize4DTile1DRangeL);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -4222,7 +4259,7 @@ static void Increment4DTile1D(std::atomic_int* processed_counters, size_t i, siz
 	}
 }
 
-TEST(Parallelize4DTile1D, SingleThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize4DTile1D, SingleThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize4DTile1DRangeI * kParallelize4DTile1DRangeJ * kParallelize4DTile1DRangeK * kParallelize4DTile1DRangeL);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -4250,7 +4287,7 @@ TEST(Parallelize4DTile1D, SingleThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize4DTile1D, MultiThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize4DTile1D, MultiThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize4DTile1DRangeI * kParallelize4DTile1DRangeJ * kParallelize4DTile1DRangeK * kParallelize4DTile1DRangeL);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -4282,7 +4319,7 @@ TEST(Parallelize4DTile1D, MultiThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize4DTile1D, SingleThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize4DTile1D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize4DTile1DRangeI * kParallelize4DTile1DRangeJ * kParallelize4DTile1DRangeK * kParallelize4DTile1DRangeL);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -4313,7 +4350,7 @@ TEST(Parallelize4DTile1D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	}
 }
 
-TEST(Parallelize4DTile1D, MultiThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize4DTile1D, MultiThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize4DTile1DRangeI * kParallelize4DTile1DRangeJ * kParallelize4DTile1DRangeK * kParallelize4DTile1DRangeL);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -4354,7 +4391,7 @@ static void IncrementSame4DTile1D(std::atomic_int* num_processed_items, size_t i
 	}
 }
 
-TEST(Parallelize4DTile1D, MultiThreadPoolHighContention) {
+TEST_F(Parallelize4DTile1D, MultiThreadPoolHighContention) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -4384,7 +4421,7 @@ static void WorkImbalance4DTile1D(std::atomic_int* num_processed_items, size_t i
 	}
 }
 
-TEST(Parallelize4DTile1D, MultiThreadPoolWorkStealing) {
+TEST_F(Parallelize4DTile1D, MultiThreadPoolWorkStealing) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -4404,10 +4441,12 @@ TEST(Parallelize4DTile1D, MultiThreadPoolWorkStealing) {
 	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize4DTile1DRangeI * kParallelize4DTile1DRangeJ * kParallelize4DTile1DRangeK * kParallelize4DTile1DRangeL);
 }
 
+class Parallelize4DTile2D : public PthreadPoolTestBase {};
+
 static void ComputeNothing4DTile2D(void*, size_t, size_t, size_t, size_t, size_t, size_t) {
 }
 
-TEST(Parallelize4DTile2D, SingleThreadPoolCompletes) {
+TEST_F(Parallelize4DTile2D, SingleThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -4419,7 +4458,7 @@ TEST(Parallelize4DTile2D, SingleThreadPoolCompletes) {
 		0 /* flags */);
 }
 
-TEST(Parallelize4DTile2D, MultiThreadPoolCompletes) {
+TEST_F(Parallelize4DTile2D, MultiThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -4445,7 +4484,7 @@ static void CheckBounds4DTile2D(void*, size_t i, size_t j, size_t start_k, size_
 	EXPECT_LE(start_l + tile_l, kParallelize4DTile2DRangeL);
 }
 
-TEST(Parallelize4DTile2D, SingleThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize4DTile2D, SingleThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -4458,7 +4497,7 @@ TEST(Parallelize4DTile2D, SingleThreadPoolAllItemsInBounds) {
 		0 /* flags */);
 }
 
-TEST(Parallelize4DTile2D, MultiThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize4DTile2D, MultiThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -4487,7 +4526,7 @@ static void CheckTiling4DTile2D(void*, size_t i, size_t j, size_t start_k, size_
 	EXPECT_EQ(tile_l, std::min<size_t>(kParallelize4DTile2DTileL, kParallelize4DTile2DRangeL - start_l));
 }
 
-TEST(Parallelize4DTile2D, SingleThreadPoolUniformTiling) {
+TEST_F(Parallelize4DTile2D, SingleThreadPoolUniformTiling) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -4500,7 +4539,7 @@ TEST(Parallelize4DTile2D, SingleThreadPoolUniformTiling) {
 		0 /* flags */);
 }
 
-TEST(Parallelize4DTile2D, MultiThreadPoolUniformTiling) {
+TEST_F(Parallelize4DTile2D, MultiThreadPoolUniformTiling) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -4526,7 +4565,7 @@ static void SetTrue4DTile2D(std::atomic_bool* processed_indicators, size_t i, si
 	}
 }
 
-TEST(Parallelize4DTile2D, SingleThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize4DTile2D, SingleThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize4DTile2DRangeI * kParallelize4DTile2DRangeJ * kParallelize4DTile2DRangeK * kParallelize4DTile2DRangeL);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -4553,7 +4592,7 @@ TEST(Parallelize4DTile2D, SingleThreadPoolAllItemsProcessed) {
 	}
 }
 
-TEST(Parallelize4DTile2D, MultiThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize4DTile2D, MultiThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize4DTile2DRangeI * kParallelize4DTile2DRangeJ * kParallelize4DTile2DRangeK * kParallelize4DTile2DRangeL);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -4593,7 +4632,7 @@ static void Increment4DTile2D(std::atomic_int* processed_counters, size_t i, siz
 	}
 }
 
-TEST(Parallelize4DTile2D, SingleThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize4DTile2D, SingleThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize4DTile2DRangeI * kParallelize4DTile2DRangeJ * kParallelize4DTile2DRangeK * kParallelize4DTile2DRangeL);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -4621,7 +4660,7 @@ TEST(Parallelize4DTile2D, SingleThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize4DTile2D, MultiThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize4DTile2D, MultiThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize4DTile2DRangeI * kParallelize4DTile2DRangeJ * kParallelize4DTile2DRangeK * kParallelize4DTile2DRangeL);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -4653,7 +4692,7 @@ TEST(Parallelize4DTile2D, MultiThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize4DTile2D, SingleThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize4DTile2D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize4DTile2DRangeI * kParallelize4DTile2DRangeJ * kParallelize4DTile2DRangeK * kParallelize4DTile2DRangeL);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -4684,7 +4723,7 @@ TEST(Parallelize4DTile2D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	}
 }
 
-TEST(Parallelize4DTile2D, MultiThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize4DTile2D, MultiThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize4DTile2DRangeI * kParallelize4DTile2DRangeJ * kParallelize4DTile2DRangeK * kParallelize4DTile2DRangeL);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -4727,7 +4766,7 @@ static void IncrementSame4DTile2D(std::atomic_int* num_processed_items, size_t i
 	}
 }
 
-TEST(Parallelize4DTile2D, MultiThreadPoolHighContention) {
+TEST_F(Parallelize4DTile2D, MultiThreadPoolHighContention) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -4757,7 +4796,7 @@ static void WorkImbalance4DTile2D(std::atomic_int* num_processed_items, size_t i
 	}
 }
 
-TEST(Parallelize4DTile2D, MultiThreadPoolWorkStealing) {
+TEST_F(Parallelize4DTile2D, MultiThreadPoolWorkStealing) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -4777,10 +4816,12 @@ TEST(Parallelize4DTile2D, MultiThreadPoolWorkStealing) {
 	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize4DTile2DRangeI * kParallelize4DTile2DRangeJ * kParallelize4DTile2DRangeK * kParallelize4DTile2DRangeL);
 }
 
+class Parallelize4DTile2DWithUArch : public PthreadPoolTestBase {};
+
 static void ComputeNothing4DTile2DWithUArch(void*, uint32_t, size_t, size_t, size_t, size_t, size_t, size_t) {
 }
 
-TEST(Parallelize4DTile2DWithUArch, SingleThreadPoolCompletes) {
+TEST_F(Parallelize4DTile2DWithUArch, SingleThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -4793,7 +4834,7 @@ TEST(Parallelize4DTile2DWithUArch, SingleThreadPoolCompletes) {
 		0 /* flags */);
 }
 
-TEST(Parallelize4DTile2DWithUArch, MultiThreadPoolCompletes) {
+TEST_F(Parallelize4DTile2DWithUArch, MultiThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -4817,7 +4858,7 @@ static void CheckUArch4DTile2DWithUArch(void*, uint32_t uarch_index, size_t, siz
 	}
 }
 
-TEST(Parallelize4DTile2DWithUArch, SingleThreadPoolUArchInBounds) {
+TEST_F(Parallelize4DTile2DWithUArch, SingleThreadPoolUArchInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -4831,7 +4872,7 @@ TEST(Parallelize4DTile2DWithUArch, SingleThreadPoolUArchInBounds) {
 		0 /* flags */);
 }
 
-TEST(Parallelize4DTile2DWithUArch, MultiThreadPoolUArchInBounds) {
+TEST_F(Parallelize4DTile2DWithUArch, MultiThreadPoolUArchInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -4858,7 +4899,7 @@ static void CheckBounds4DTile2DWithUArch(void*, uint32_t, size_t i, size_t j, si
 	EXPECT_LE(start_l + tile_l, kParallelize4DTile2DRangeL);
 }
 
-TEST(Parallelize4DTile2DWithUArch, SingleThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize4DTile2DWithUArch, SingleThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -4872,7 +4913,7 @@ TEST(Parallelize4DTile2DWithUArch, SingleThreadPoolAllItemsInBounds) {
 		0 /* flags */);
 }
 
-TEST(Parallelize4DTile2DWithUArch, MultiThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize4DTile2DWithUArch, MultiThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -4902,7 +4943,7 @@ static void CheckTiling4DTile2DWithUArch(void*, uint32_t, size_t i, size_t j, si
 	EXPECT_EQ(tile_l, std::min<size_t>(kParallelize4DTile2DTileL, kParallelize4DTile2DRangeL - start_l));
 }
 
-TEST(Parallelize4DTile2DWithUArch, SingleThreadPoolUniformTiling) {
+TEST_F(Parallelize4DTile2DWithUArch, SingleThreadPoolUniformTiling) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -4916,7 +4957,7 @@ TEST(Parallelize4DTile2DWithUArch, SingleThreadPoolUniformTiling) {
 		0 /* flags */);
 }
 
-TEST(Parallelize4DTile2DWithUArch, MultiThreadPoolUniformTiling) {
+TEST_F(Parallelize4DTile2DWithUArch, MultiThreadPoolUniformTiling) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -4943,7 +4984,7 @@ static void SetTrue4DTile2DWithUArch(std::atomic_bool* processed_indicators, uin
 	}
 }
 
-TEST(Parallelize4DTile2DWithUArch, SingleThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize4DTile2DWithUArch, SingleThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize4DTile2DRangeI * kParallelize4DTile2DRangeJ * kParallelize4DTile2DRangeK * kParallelize4DTile2DRangeL);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -4971,7 +5012,7 @@ TEST(Parallelize4DTile2DWithUArch, SingleThreadPoolAllItemsProcessed) {
 	}
 }
 
-TEST(Parallelize4DTile2DWithUArch, MultiThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize4DTile2DWithUArch, MultiThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize4DTile2DRangeI * kParallelize4DTile2DRangeJ * kParallelize4DTile2DRangeK * kParallelize4DTile2DRangeL);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -5012,7 +5053,7 @@ static void Increment4DTile2DWithUArch(std::atomic_int* processed_counters, uint
 	}
 }
 
-TEST(Parallelize4DTile2DWithUArch, SingleThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize4DTile2DWithUArch, SingleThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize4DTile2DRangeI * kParallelize4DTile2DRangeJ * kParallelize4DTile2DRangeK * kParallelize4DTile2DRangeL);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -5041,7 +5082,7 @@ TEST(Parallelize4DTile2DWithUArch, SingleThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize4DTile2DWithUArch, MultiThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize4DTile2DWithUArch, MultiThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize4DTile2DRangeI * kParallelize4DTile2DRangeJ * kParallelize4DTile2DRangeK * kParallelize4DTile2DRangeL);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -5074,7 +5115,7 @@ TEST(Parallelize4DTile2DWithUArch, MultiThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize4DTile2DWithUArch, SingleThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize4DTile2DWithUArch, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize4DTile2DRangeI * kParallelize4DTile2DRangeJ * kParallelize4DTile2DRangeK * kParallelize4DTile2DRangeL);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -5106,7 +5147,7 @@ TEST(Parallelize4DTile2DWithUArch, SingleThreadPoolEachItemProcessedMultipleTime
 	}
 }
 
-TEST(Parallelize4DTile2DWithUArch, MultiThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize4DTile2DWithUArch, MultiThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize4DTile2DRangeI * kParallelize4DTile2DRangeJ * kParallelize4DTile2DRangeK * kParallelize4DTile2DRangeL);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -5150,7 +5191,7 @@ static void IncrementSame4DTile2DWithUArch(std::atomic_int* num_processed_items,
 	}
 }
 
-TEST(Parallelize4DTile2DWithUArch, MultiThreadPoolHighContention) {
+TEST_F(Parallelize4DTile2DWithUArch, MultiThreadPoolHighContention) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -5181,7 +5222,7 @@ static void WorkImbalance4DTile2DWithUArch(std::atomic_int* num_processed_items,
 	}
 }
 
-TEST(Parallelize4DTile2DWithUArch, MultiThreadPoolWorkStealing) {
+TEST_F(Parallelize4DTile2DWithUArch, MultiThreadPoolWorkStealing) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -5202,10 +5243,12 @@ TEST(Parallelize4DTile2DWithUArch, MultiThreadPoolWorkStealing) {
 	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize4DTile2DRangeI * kParallelize4DTile2DRangeJ * kParallelize4DTile2DRangeK * kParallelize4DTile2DRangeL);
 }
 
+class Parallelize5D : public PthreadPoolTestBase {};
+
 static void ComputeNothing5D(void*, size_t, size_t, size_t, size_t, size_t) {
 }
 
-TEST(Parallelize5D, SingleThreadPoolCompletes) {
+TEST_F(Parallelize5D, SingleThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -5216,7 +5259,7 @@ TEST(Parallelize5D, SingleThreadPoolCompletes) {
 		0 /* flags */);
 }
 
-TEST(Parallelize5D, MultiThreadPoolCompletes) {
+TEST_F(Parallelize5D, MultiThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -5240,7 +5283,7 @@ static void CheckBounds5D(void*, size_t i, size_t j, size_t k, size_t l, size_t 
 	EXPECT_LT(m, kParallelize5DRangeM);
 }
 
-TEST(Parallelize5D, SingleThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize5D, SingleThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -5252,7 +5295,7 @@ TEST(Parallelize5D, SingleThreadPoolAllItemsInBounds) {
 		0 /* flags */);
 }
 
-TEST(Parallelize5D, MultiThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize5D, MultiThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -5273,7 +5316,7 @@ static void SetTrue5D(std::atomic_bool* processed_indicators, size_t i, size_t j
 	processed_indicators[linear_idx].store(true, std::memory_order_relaxed);
 }
 
-TEST(Parallelize5D, SingleThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize5D, SingleThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize5DRangeI * kParallelize5DRangeJ * kParallelize5DRangeK * kParallelize5DRangeL * kParallelize5DRangeM);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -5301,7 +5344,7 @@ TEST(Parallelize5D, SingleThreadPoolAllItemsProcessed) {
 	}
 }
 
-TEST(Parallelize5D, MultiThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize5D, MultiThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize5DRangeI * kParallelize5DRangeJ * kParallelize5DRangeK * kParallelize5DRangeL * kParallelize5DRangeM);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -5338,7 +5381,7 @@ static void Increment5D(std::atomic_int* processed_counters, size_t i, size_t j,
 	processed_counters[linear_idx].fetch_add(1, std::memory_order_relaxed);
 }
 
-TEST(Parallelize5D, SingleThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize5D, SingleThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize5DRangeI * kParallelize5DRangeJ * kParallelize5DRangeK * kParallelize5DRangeL * kParallelize5DRangeM);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -5367,7 +5410,7 @@ TEST(Parallelize5D, SingleThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize5D, MultiThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize5D, MultiThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize5DRangeI * kParallelize5DRangeJ * kParallelize5DRangeK * kParallelize5DRangeL * kParallelize5DRangeM);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -5400,7 +5443,7 @@ TEST(Parallelize5D, MultiThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize5D, SingleThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize5D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize5DRangeI * kParallelize5DRangeJ * kParallelize5DRangeK * kParallelize5DRangeL * kParallelize5DRangeM);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -5432,7 +5475,7 @@ TEST(Parallelize5D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	}
 }
 
-TEST(Parallelize5D, MultiThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize5D, MultiThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize5DRangeI * kParallelize5DRangeJ * kParallelize5DRangeK * kParallelize5DRangeL * kParallelize5DRangeM);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -5472,7 +5515,7 @@ static void IncrementSame5D(std::atomic_int* num_processed_items, size_t i, size
 	num_processed_items->fetch_add(1, std::memory_order_relaxed);
 }
 
-TEST(Parallelize5D, MultiThreadPoolHighContention) {
+TEST_F(Parallelize5D, MultiThreadPoolHighContention) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -5501,7 +5544,7 @@ static void WorkImbalance5D(std::atomic_int* num_processed_items, size_t i, size
 	}
 }
 
-TEST(Parallelize5D, MultiThreadPoolWorkStealing) {
+TEST_F(Parallelize5D, MultiThreadPoolWorkStealing) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -5520,10 +5563,12 @@ TEST(Parallelize5D, MultiThreadPoolWorkStealing) {
 	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize5DRangeI * kParallelize5DRangeJ * kParallelize5DRangeK * kParallelize5DRangeL * kParallelize5DRangeM);
 }
 
+class Parallelize5DTile1D : public PthreadPoolTestBase {};
+
 static void ComputeNothing5DTile1D(void*, size_t, size_t, size_t, size_t, size_t, size_t) {
 }
 
-TEST(Parallelize5DTile1D, SingleThreadPoolCompletes) {
+TEST_F(Parallelize5DTile1D, SingleThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -5535,7 +5580,7 @@ TEST(Parallelize5DTile1D, SingleThreadPoolCompletes) {
 		0 /* flags */);
 }
 
-TEST(Parallelize5DTile1D, MultiThreadPoolCompletes) {
+TEST_F(Parallelize5DTile1D, MultiThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -5561,7 +5606,7 @@ static void CheckBounds5DTile1D(void*, size_t i, size_t j, size_t k, size_t l, s
 	EXPECT_LE(start_m + tile_m, kParallelize5DTile1DRangeM);
 }
 
-TEST(Parallelize5DTile1D, SingleThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize5DTile1D, SingleThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -5574,7 +5619,7 @@ TEST(Parallelize5DTile1D, SingleThreadPoolAllItemsInBounds) {
 		0 /* flags */);
 }
 
-TEST(Parallelize5DTile1D, MultiThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize5DTile1D, MultiThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -5598,7 +5643,7 @@ static void CheckTiling5DTile1D(void*, size_t i, size_t j, size_t k, size_t l, s
 	EXPECT_EQ(tile_m, std::min<size_t>(kParallelize5DTile1DTileM, kParallelize5DTile1DRangeM - start_m));
 }
 
-TEST(Parallelize5DTile1D, SingleThreadPoolUniformTiling) {
+TEST_F(Parallelize5DTile1D, SingleThreadPoolUniformTiling) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -5611,7 +5656,7 @@ TEST(Parallelize5DTile1D, SingleThreadPoolUniformTiling) {
 		0 /* flags */);
 }
 
-TEST(Parallelize5DTile1D, MultiThreadPoolUniformTiling) {
+TEST_F(Parallelize5DTile1D, MultiThreadPoolUniformTiling) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -5635,7 +5680,7 @@ static void SetTrue5DTile1D(std::atomic_bool* processed_indicators, size_t i, si
 	}
 }
 
-TEST(Parallelize5DTile1D, SingleThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize5DTile1D, SingleThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize5DTile1DRangeI * kParallelize5DTile1DRangeJ * kParallelize5DTile1DRangeK * kParallelize5DTile1DRangeL * kParallelize5DTile1DRangeM);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -5664,7 +5709,7 @@ TEST(Parallelize5DTile1D, SingleThreadPoolAllItemsProcessed) {
 	}
 }
 
-TEST(Parallelize5DTile1D, MultiThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize5DTile1D, MultiThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize5DTile1DRangeI * kParallelize5DTile1DRangeJ * kParallelize5DTile1DRangeK * kParallelize5DTile1DRangeL * kParallelize5DTile1DRangeM);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -5704,7 +5749,7 @@ static void Increment5DTile1D(std::atomic_int* processed_counters, size_t i, siz
 	}
 }
 
-TEST(Parallelize5DTile1D, SingleThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize5DTile1D, SingleThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize5DTile1DRangeI * kParallelize5DTile1DRangeJ * kParallelize5DTile1DRangeK * kParallelize5DTile1DRangeL * kParallelize5DTile1DRangeM);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -5734,7 +5779,7 @@ TEST(Parallelize5DTile1D, SingleThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize5DTile1D, MultiThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize5DTile1D, MultiThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize5DTile1DRangeI * kParallelize5DTile1DRangeJ * kParallelize5DTile1DRangeK * kParallelize5DTile1DRangeL * kParallelize5DTile1DRangeM);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -5768,7 +5813,7 @@ TEST(Parallelize5DTile1D, MultiThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize5DTile1D, SingleThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize5DTile1D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize5DTile1DRangeI * kParallelize5DTile1DRangeJ * kParallelize5DTile1DRangeK * kParallelize5DTile1DRangeL * kParallelize5DTile1DRangeM);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -5801,7 +5846,7 @@ TEST(Parallelize5DTile1D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	}
 }
 
-TEST(Parallelize5DTile1D, MultiThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize5DTile1D, MultiThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize5DTile1DRangeI * kParallelize5DTile1DRangeJ * kParallelize5DTile1DRangeK * kParallelize5DTile1DRangeL * kParallelize5DTile1DRangeM);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -5844,7 +5889,7 @@ static void IncrementSame5DTile1D(std::atomic_int* num_processed_items, size_t i
 	}
 }
 
-TEST(Parallelize5DTile1D, MultiThreadPoolHighContention) {
+TEST_F(Parallelize5DTile1D, MultiThreadPoolHighContention) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -5874,7 +5919,7 @@ static void WorkImbalance5DTile1D(std::atomic_int* num_processed_items, size_t i
 	}
 }
 
-TEST(Parallelize5DTile1D, MultiThreadPoolWorkStealing) {
+TEST_F(Parallelize5DTile1D, MultiThreadPoolWorkStealing) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -5894,10 +5939,12 @@ TEST(Parallelize5DTile1D, MultiThreadPoolWorkStealing) {
 	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize5DTile1DRangeI * kParallelize5DTile1DRangeJ * kParallelize5DTile1DRangeK * kParallelize5DTile1DRangeL * kParallelize5DTile1DRangeM);
 }
 
+class Parallelize5DTile2D : public PthreadPoolTestBase {};
+
 static void ComputeNothing5DTile2D(void*, size_t, size_t, size_t, size_t, size_t, size_t, size_t) {
 }
 
-TEST(Parallelize5DTile2D, SingleThreadPoolCompletes) {
+TEST_F(Parallelize5DTile2D, SingleThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -5909,7 +5956,7 @@ TEST(Parallelize5DTile2D, SingleThreadPoolCompletes) {
 		0 /* flags */);
 }
 
-TEST(Parallelize5DTile2D, MultiThreadPoolCompletes) {
+TEST_F(Parallelize5DTile2D, MultiThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -5936,7 +5983,7 @@ static void CheckBounds5DTile2D(void*, size_t i, size_t j, size_t k, size_t star
 	EXPECT_LE(start_m + tile_m, kParallelize5DTile2DRangeM);
 }
 
-TEST(Parallelize5DTile2D, SingleThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize5DTile2D, SingleThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -5949,7 +5996,7 @@ TEST(Parallelize5DTile2D, SingleThreadPoolAllItemsInBounds) {
 		0 /* flags */);
 }
 
-TEST(Parallelize5DTile2D, MultiThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize5DTile2D, MultiThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -5978,7 +6025,7 @@ static void CheckTiling5DTile2D(void*, size_t i, size_t j, size_t k, size_t star
 	EXPECT_EQ(tile_m, std::min<size_t>(kParallelize5DTile2DTileM, kParallelize5DTile2DRangeM - start_m));
 }
 
-TEST(Parallelize5DTile2D, SingleThreadPoolUniformTiling) {
+TEST_F(Parallelize5DTile2D, SingleThreadPoolUniformTiling) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -5991,7 +6038,7 @@ TEST(Parallelize5DTile2D, SingleThreadPoolUniformTiling) {
 		0 /* flags */);
 }
 
-TEST(Parallelize5DTile2D, MultiThreadPoolUniformTiling) {
+TEST_F(Parallelize5DTile2D, MultiThreadPoolUniformTiling) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -6017,7 +6064,7 @@ static void SetTrue5DTile2D(std::atomic_bool* processed_indicators, size_t i, si
 	}
 }
 
-TEST(Parallelize5DTile2D, SingleThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize5DTile2D, SingleThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize5DTile2DRangeI * kParallelize5DTile2DRangeJ * kParallelize5DTile2DRangeK * kParallelize5DTile2DRangeL * kParallelize5DTile2DRangeM);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -6046,7 +6093,7 @@ TEST(Parallelize5DTile2D, SingleThreadPoolAllItemsProcessed) {
 	}
 }
 
-TEST(Parallelize5DTile2D, MultiThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize5DTile2D, MultiThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize5DTile2DRangeI * kParallelize5DTile2DRangeJ * kParallelize5DTile2DRangeK * kParallelize5DTile2DRangeL * kParallelize5DTile2DRangeM);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -6088,7 +6135,7 @@ static void Increment5DTile2D(std::atomic_int* processed_counters, size_t i, siz
 	}
 }
 
-TEST(Parallelize5DTile2D, SingleThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize5DTile2D, SingleThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize5DTile2DRangeI * kParallelize5DTile2DRangeJ * kParallelize5DTile2DRangeK * kParallelize5DTile2DRangeL * kParallelize5DTile2DRangeM);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -6118,7 +6165,7 @@ TEST(Parallelize5DTile2D, SingleThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize5DTile2D, MultiThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize5DTile2D, MultiThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize5DTile2DRangeI * kParallelize5DTile2DRangeJ * kParallelize5DTile2DRangeK * kParallelize5DTile2DRangeL * kParallelize5DTile2DRangeM);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -6152,7 +6199,7 @@ TEST(Parallelize5DTile2D, MultiThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize5DTile2D, SingleThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize5DTile2D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize5DTile2DRangeI * kParallelize5DTile2DRangeJ * kParallelize5DTile2DRangeK * kParallelize5DTile2DRangeL * kParallelize5DTile2DRangeM);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -6185,7 +6232,7 @@ TEST(Parallelize5DTile2D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	}
 }
 
-TEST(Parallelize5DTile2D, MultiThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize5DTile2D, MultiThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize5DTile2DRangeI * kParallelize5DTile2DRangeJ * kParallelize5DTile2DRangeK * kParallelize5DTile2DRangeL * kParallelize5DTile2DRangeM);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -6230,7 +6277,7 @@ static void IncrementSame5DTile2D(std::atomic_int* num_processed_items, size_t i
 	}
 }
 
-TEST(Parallelize5DTile2D, MultiThreadPoolHighContention) {
+TEST_F(Parallelize5DTile2D, MultiThreadPoolHighContention) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -6260,7 +6307,7 @@ static void WorkImbalance5DTile2D(std::atomic_int* num_processed_items, size_t i
 	}
 }
 
-TEST(Parallelize5DTile2D, MultiThreadPoolWorkStealing) {
+TEST_F(Parallelize5DTile2D, MultiThreadPoolWorkStealing) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -6280,10 +6327,12 @@ TEST(Parallelize5DTile2D, MultiThreadPoolWorkStealing) {
 	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize5DTile2DRangeI * kParallelize5DTile2DRangeJ * kParallelize5DTile2DRangeK * kParallelize5DTile2DRangeL * kParallelize5DTile2DRangeM);
 }
 
+class Parallelize6D : public PthreadPoolTestBase {};
+
 static void ComputeNothing6D(void*, size_t, size_t, size_t, size_t, size_t, size_t) {
 }
 
-TEST(Parallelize6D, SingleThreadPoolCompletes) {
+TEST_F(Parallelize6D, SingleThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -6294,7 +6343,7 @@ TEST(Parallelize6D, SingleThreadPoolCompletes) {
 		0 /* flags */);
 }
 
-TEST(Parallelize6D, MultiThreadPoolCompletes) {
+TEST_F(Parallelize6D, MultiThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -6319,7 +6368,7 @@ static void CheckBounds6D(void*, size_t i, size_t j, size_t k, size_t l, size_t 
 	EXPECT_LT(n, kParallelize6DRangeN);
 }
 
-TEST(Parallelize6D, SingleThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize6D, SingleThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -6331,7 +6380,7 @@ TEST(Parallelize6D, SingleThreadPoolAllItemsInBounds) {
 		0 /* flags */);
 }
 
-TEST(Parallelize6D, MultiThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize6D, MultiThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -6352,7 +6401,7 @@ static void SetTrue6D(std::atomic_bool* processed_indicators, size_t i, size_t j
 	processed_indicators[linear_idx].store(true, std::memory_order_relaxed);
 }
 
-TEST(Parallelize6D, SingleThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize6D, SingleThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize6DRangeI * kParallelize6DRangeJ * kParallelize6DRangeK * kParallelize6DRangeL * kParallelize6DRangeM * kParallelize6DRangeN);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -6382,7 +6431,7 @@ TEST(Parallelize6D, SingleThreadPoolAllItemsProcessed) {
 	}
 }
 
-TEST(Parallelize6D, MultiThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize6D, MultiThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize6DRangeI * kParallelize6DRangeJ * kParallelize6DRangeK * kParallelize6DRangeL * kParallelize6DRangeM * kParallelize6DRangeN);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -6421,7 +6470,7 @@ static void Increment6D(std::atomic_int* processed_counters, size_t i, size_t j,
 	processed_counters[linear_idx].fetch_add(1, std::memory_order_relaxed);
 }
 
-TEST(Parallelize6D, SingleThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize6D, SingleThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize6DRangeI * kParallelize6DRangeJ * kParallelize6DRangeK * kParallelize6DRangeL * kParallelize6DRangeM * kParallelize6DRangeN);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -6452,7 +6501,7 @@ TEST(Parallelize6D, SingleThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize6D, MultiThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize6D, MultiThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize6DRangeI * kParallelize6DRangeJ * kParallelize6DRangeK * kParallelize6DRangeL * kParallelize6DRangeM * kParallelize6DRangeN);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -6487,7 +6536,7 @@ TEST(Parallelize6D, MultiThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize6D, SingleThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize6D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize6DRangeI * kParallelize6DRangeJ * kParallelize6DRangeK * kParallelize6DRangeL * kParallelize6DRangeM * kParallelize6DRangeN);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -6521,7 +6570,7 @@ TEST(Parallelize6D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	}
 }
 
-TEST(Parallelize6D, MultiThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize6D, MultiThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize6DRangeI * kParallelize6DRangeJ * kParallelize6DRangeK * kParallelize6DRangeL * kParallelize6DRangeM * kParallelize6DRangeN);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -6563,7 +6612,7 @@ static void IncrementSame6D(std::atomic_int* num_processed_items, size_t i, size
 	num_processed_items->fetch_add(1, std::memory_order_relaxed);
 }
 
-TEST(Parallelize6D, MultiThreadPoolHighContention) {
+TEST_F(Parallelize6D, MultiThreadPoolHighContention) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -6592,7 +6641,7 @@ static void WorkImbalance6D(std::atomic_int* num_processed_items, size_t i, size
 	}
 }
 
-TEST(Parallelize6D, MultiThreadPoolWorkStealing) {
+TEST_F(Parallelize6D, MultiThreadPoolWorkStealing) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -6611,10 +6660,12 @@ TEST(Parallelize6D, MultiThreadPoolWorkStealing) {
 	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize6DRangeI * kParallelize6DRangeJ * kParallelize6DRangeK * kParallelize6DRangeL * kParallelize6DRangeM * kParallelize6DRangeN);
 }
 
+class Parallelize6DTile1D : public PthreadPoolTestBase {};
+
 static void ComputeNothing6DTile1D(void*, size_t, size_t, size_t, size_t, size_t, size_t, size_t) {
 }
 
-TEST(Parallelize6DTile1D, SingleThreadPoolCompletes) {
+TEST_F(Parallelize6DTile1D, SingleThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -6626,7 +6677,7 @@ TEST(Parallelize6DTile1D, SingleThreadPoolCompletes) {
 		0 /* flags */);
 }
 
-TEST(Parallelize6DTile1D, MultiThreadPoolCompletes) {
+TEST_F(Parallelize6DTile1D, MultiThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -6653,7 +6704,7 @@ static void CheckBounds6DTile1D(void*, size_t i, size_t j, size_t k, size_t l, s
 	EXPECT_LE(start_n + tile_n, kParallelize6DTile1DRangeN);
 }
 
-TEST(Parallelize6DTile1D, SingleThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize6DTile1D, SingleThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -6666,7 +6717,7 @@ TEST(Parallelize6DTile1D, SingleThreadPoolAllItemsInBounds) {
 		0 /* flags */);
 }
 
-TEST(Parallelize6DTile1D, MultiThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize6DTile1D, MultiThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -6690,7 +6741,7 @@ static void CheckTiling6DTile1D(void*, size_t i, size_t j, size_t k, size_t l, s
 	EXPECT_EQ(tile_n, std::min<size_t>(kParallelize6DTile1DTileN, kParallelize6DTile1DRangeN - start_n));
 }
 
-TEST(Parallelize6DTile1D, SingleThreadPoolUniformTiling) {
+TEST_F(Parallelize6DTile1D, SingleThreadPoolUniformTiling) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -6703,7 +6754,7 @@ TEST(Parallelize6DTile1D, SingleThreadPoolUniformTiling) {
 		0 /* flags */);
 }
 
-TEST(Parallelize6DTile1D, MultiThreadPoolUniformTiling) {
+TEST_F(Parallelize6DTile1D, MultiThreadPoolUniformTiling) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -6727,7 +6778,7 @@ static void SetTrue6DTile1D(std::atomic_bool* processed_indicators, size_t i, si
 	}
 }
 
-TEST(Parallelize6DTile1D, SingleThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize6DTile1D, SingleThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize6DTile1DRangeI * kParallelize6DTile1DRangeJ * kParallelize6DTile1DRangeK * kParallelize6DTile1DRangeL * kParallelize6DTile1DRangeM * kParallelize6DTile1DRangeN);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -6758,7 +6809,7 @@ TEST(Parallelize6DTile1D, SingleThreadPoolAllItemsProcessed) {
 	}
 }
 
-TEST(Parallelize6DTile1D, MultiThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize6DTile1D, MultiThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize6DTile1DRangeI * kParallelize6DTile1DRangeJ * kParallelize6DTile1DRangeK * kParallelize6DTile1DRangeL * kParallelize6DTile1DRangeM * kParallelize6DTile1DRangeN);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -6800,7 +6851,7 @@ static void Increment6DTile1D(std::atomic_int* processed_counters, size_t i, siz
 	}
 }
 
-TEST(Parallelize6DTile1D, SingleThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize6DTile1D, SingleThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize6DTile1DRangeI * kParallelize6DTile1DRangeJ * kParallelize6DTile1DRangeK * kParallelize6DTile1DRangeL * kParallelize6DTile1DRangeM * kParallelize6DTile1DRangeN);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -6832,7 +6883,7 @@ TEST(Parallelize6DTile1D, SingleThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize6DTile1D, MultiThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize6DTile1D, MultiThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize6DTile1DRangeI * kParallelize6DTile1DRangeJ * kParallelize6DTile1DRangeK * kParallelize6DTile1DRangeL * kParallelize6DTile1DRangeM * kParallelize6DTile1DRangeN);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -6868,7 +6919,7 @@ TEST(Parallelize6DTile1D, MultiThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize6DTile1D, SingleThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize6DTile1D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize6DTile1DRangeI * kParallelize6DTile1DRangeJ * kParallelize6DTile1DRangeK * kParallelize6DTile1DRangeL * kParallelize6DTile1DRangeM * kParallelize6DTile1DRangeN);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -6903,7 +6954,7 @@ TEST(Parallelize6DTile1D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	}
 }
 
-TEST(Parallelize6DTile1D, MultiThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize6DTile1D, MultiThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize6DTile1DRangeI * kParallelize6DTile1DRangeJ * kParallelize6DTile1DRangeK * kParallelize6DTile1DRangeL * kParallelize6DTile1DRangeM * kParallelize6DTile1DRangeN);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -6948,7 +6999,7 @@ static void IncrementSame6DTile1D(std::atomic_int* num_processed_items, size_t i
 	}
 }
 
-TEST(Parallelize6DTile1D, MultiThreadPoolHighContention) {
+TEST_F(Parallelize6DTile1D, MultiThreadPoolHighContention) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -6978,7 +7029,7 @@ static void WorkImbalance6DTile1D(std::atomic_int* num_processed_items, size_t i
 	}
 }
 
-TEST(Parallelize6DTile1D, MultiThreadPoolWorkStealing) {
+TEST_F(Parallelize6DTile1D, MultiThreadPoolWorkStealing) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -6998,10 +7049,12 @@ TEST(Parallelize6DTile1D, MultiThreadPoolWorkStealing) {
 	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize6DTile1DRangeI * kParallelize6DTile1DRangeJ * kParallelize6DTile1DRangeK * kParallelize6DTile1DRangeL * kParallelize6DTile1DRangeM * kParallelize6DTile1DRangeN);
 }
 
+class Parallelize6DTile2D : public PthreadPoolTestBase {};
+
 static void ComputeNothing6DTile2D(void*, size_t, size_t, size_t, size_t, size_t, size_t, size_t, size_t) {
 }
 
-TEST(Parallelize6DTile2D, SingleThreadPoolCompletes) {
+TEST_F(Parallelize6DTile2D, SingleThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -7013,7 +7066,7 @@ TEST(Parallelize6DTile2D, SingleThreadPoolCompletes) {
 		0 /* flags */);
 }
 
-TEST(Parallelize6DTile2D, MultiThreadPoolCompletes) {
+TEST_F(Parallelize6DTile2D, MultiThreadPoolCompletes) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -7041,7 +7094,7 @@ static void CheckBounds6DTile2D(void*, size_t i, size_t j, size_t k, size_t l, s
 	EXPECT_LE(start_n + tile_n, kParallelize6DTile2DRangeN);
 }
 
-TEST(Parallelize6DTile2D, SingleThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize6DTile2D, SingleThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -7054,7 +7107,7 @@ TEST(Parallelize6DTile2D, SingleThreadPoolAllItemsInBounds) {
 		0 /* flags */);
 }
 
-TEST(Parallelize6DTile2D, MultiThreadPoolAllItemsInBounds) {
+TEST_F(Parallelize6DTile2D, MultiThreadPoolAllItemsInBounds) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -7083,7 +7136,7 @@ static void CheckTiling6DTile2D(void*, size_t i, size_t j, size_t k, size_t l, s
 	EXPECT_EQ(tile_n, std::min<size_t>(kParallelize6DTile2DTileN, kParallelize6DTile2DRangeN - start_n));
 }
 
-TEST(Parallelize6DTile2D, SingleThreadPoolUniformTiling) {
+TEST_F(Parallelize6DTile2D, SingleThreadPoolUniformTiling) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -7096,7 +7149,7 @@ TEST(Parallelize6DTile2D, SingleThreadPoolUniformTiling) {
 		0 /* flags */);
 }
 
-TEST(Parallelize6DTile2D, MultiThreadPoolUniformTiling) {
+TEST_F(Parallelize6DTile2D, MultiThreadPoolUniformTiling) {
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
 	ASSERT_TRUE(threadpool.get());
 
@@ -7122,7 +7175,7 @@ static void SetTrue6DTile2D(std::atomic_bool* processed_indicators, size_t i, si
 	}
 }
 
-TEST(Parallelize6DTile2D, SingleThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize6DTile2D, SingleThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize6DTile2DRangeI * kParallelize6DTile2DRangeJ * kParallelize6DTile2DRangeK * kParallelize6DTile2DRangeL * kParallelize6DTile2DRangeM * kParallelize6DTile2DRangeN);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -7153,7 +7206,7 @@ TEST(Parallelize6DTile2D, SingleThreadPoolAllItemsProcessed) {
 	}
 }
 
-TEST(Parallelize6DTile2D, MultiThreadPoolAllItemsProcessed) {
+TEST_F(Parallelize6DTile2D, MultiThreadPoolAllItemsProcessed) {
 	std::vector<std::atomic_bool> indicators(kParallelize6DTile2DRangeI * kParallelize6DTile2DRangeJ * kParallelize6DTile2DRangeK * kParallelize6DTile2DRangeL * kParallelize6DTile2DRangeM * kParallelize6DTile2DRangeN);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -7197,7 +7250,7 @@ static void Increment6DTile2D(std::atomic_int* processed_counters, size_t i, siz
 	}
 }
 
-TEST(Parallelize6DTile2D, SingleThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize6DTile2D, SingleThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize6DTile2DRangeI * kParallelize6DTile2DRangeJ * kParallelize6DTile2DRangeK * kParallelize6DTile2DRangeL * kParallelize6DTile2DRangeM * kParallelize6DTile2DRangeN);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -7229,7 +7282,7 @@ TEST(Parallelize6DTile2D, SingleThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize6DTile2D, MultiThreadPoolEachItemProcessedOnce) {
+TEST_F(Parallelize6DTile2D, MultiThreadPoolEachItemProcessedOnce) {
 	std::vector<std::atomic_int> counters(kParallelize6DTile2DRangeI * kParallelize6DTile2DRangeJ * kParallelize6DTile2DRangeK * kParallelize6DTile2DRangeL * kParallelize6DTile2DRangeM * kParallelize6DTile2DRangeN);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -7265,7 +7318,7 @@ TEST(Parallelize6DTile2D, MultiThreadPoolEachItemProcessedOnce) {
 	}
 }
 
-TEST(Parallelize6DTile2D, SingleThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize6DTile2D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize6DTile2DRangeI * kParallelize6DTile2DRangeJ * kParallelize6DTile2DRangeK * kParallelize6DTile2DRangeL * kParallelize6DTile2DRangeM * kParallelize6DTile2DRangeN);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
@@ -7300,7 +7353,7 @@ TEST(Parallelize6DTile2D, SingleThreadPoolEachItemProcessedMultipleTimes) {
 	}
 }
 
-TEST(Parallelize6DTile2D, MultiThreadPoolEachItemProcessedMultipleTimes) {
+TEST_F(Parallelize6DTile2D, MultiThreadPoolEachItemProcessedMultipleTimes) {
 	std::vector<std::atomic_int> counters(kParallelize6DTile2DRangeI * kParallelize6DTile2DRangeJ * kParallelize6DTile2DRangeK * kParallelize6DTile2DRangeL * kParallelize6DTile2DRangeM * kParallelize6DTile2DRangeN);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -7347,7 +7400,7 @@ static void IncrementSame6DTile2D(std::atomic_int* num_processed_items, size_t i
 	}
 }
 
-TEST(Parallelize6DTile2D, MultiThreadPoolHighContention) {
+TEST_F(Parallelize6DTile2D, MultiThreadPoolHighContention) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
@@ -7377,7 +7430,7 @@ static void WorkImbalance6DTile2D(std::atomic_int* num_processed_items, size_t i
 	}
 }
 
-TEST(Parallelize6DTile2D, MultiThreadPoolWorkStealing) {
+TEST_F(Parallelize6DTile2D, MultiThreadPoolWorkStealing) {
 	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
 
 	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);

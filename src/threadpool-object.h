@@ -698,6 +698,13 @@ struct PTHREADPOOL_CACHELINE_ALIGNED pthreadpool {
 	 */
 	HANDLE command_event[2];
 #endif
+#if PTHREADPOOL_USE_JOBS
+	/**
+	 * Serializes concurrent calls to @a pthreadpool_parallelize_* from different threads.
+	 * A pointer of Chromium's base::Lock.
+	 */
+	void* execution_lock;
+#endif
 	/**
 	 * FXdiv divisor for the number of threads in the thread pool.
 	 * This struct never change after pthreadpool_create.
@@ -711,6 +718,10 @@ struct PTHREADPOOL_CACHELINE_ALIGNED pthreadpool {
 
 PTHREADPOOL_STATIC_ASSERT(sizeof(struct pthreadpool) % PTHREADPOOL_CACHELINE_SIZE == 0,
 	"pthreadpool structure must occupy an integer number of cache lines (64 bytes)");
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 PTHREADPOOL_INTERNAL struct pthreadpool* pthreadpool_allocate(
 	size_t threads_count);
@@ -813,3 +824,7 @@ PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_6d_tile_1d_fastpath(
 PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_6d_tile_2d_fastpath(
 	struct pthreadpool* threadpool,
 	struct thread_info* thread);
+
+#ifdef __cplusplus
+} /* extern "C" */
+#endif
