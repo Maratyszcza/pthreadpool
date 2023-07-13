@@ -21,6 +21,8 @@ struct fpu_state {
 	uint64_t fpcr;
 #elif defined(__SSE__) || defined(__x86_64__) || defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 1)
 	uint32_t mxcsr;
+#elif defined(__GNUC__) && defined(__riscv) && defined(__riscv_flen)
+	uint32_t fcsr;
 #else
 	char unused;
 #endif
@@ -38,6 +40,8 @@ static inline struct fpu_state get_fpu_state() {
 	__asm__ __volatile__("VMRS %[fpscr], fpscr" : [fpscr] "=r" (state.fpscr));
 #elif defined(__GNUC__) && defined(__aarch64__)
 	__asm__ __volatile__("MRS %[fpcr], fpcr" : [fpcr] "=r" (state.fpcr));
+#elif defined(__GNUC__) && defined(__riscv) && defined(__riscv_flen)
+	__asm__ __volatile__("FRCSR %[fcsr]" : [fcsr] "=r" (state.fcsr));
 #endif
 	return state;
 }
@@ -53,6 +57,8 @@ static inline void set_fpu_state(const struct fpu_state state) {
 	__asm__ __volatile__("MSR fpcr, %[fpcr]" : : [fpcr] "r" (state.fpcr));
 #elif defined(__SSE__) || defined(__x86_64__) || defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 1)
 	_mm_setcsr((unsigned int) state.mxcsr);
+#elif defined(__GNUC__) && defined(__riscv) && defined(__riscv_flen)
+	__asm__ __volatile__("FSCSR %[fcsr]" : : [fcsr] "r" (state.fcsr));
 #endif
 }
 
@@ -92,6 +98,8 @@ static inline void disable_fpu_denormals() {
 		: [fpcr] "=r" (fpcr));
 #elif defined(__SSE__) || defined(__x86_64__) || defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 1)
 	_mm_setcsr(_mm_getcsr() | 0x8040);
+#elif defined(__GNUC__) && defined(__riscv) && defined(__riscv_flen)
+	/* Not supported by RISC-V */
 #endif
 }
 
