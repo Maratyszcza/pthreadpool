@@ -235,6 +235,33 @@ struct pthreadpool_3d_tile_1d_params {
 	struct fxdiv_divisor_size_t tile_range_k;
 };
 
+struct pthreadpool_3d_tile_1d_with_uarch_params {
+	/**
+	 * Copy of the default_uarch_index argument passed to the pthreadpool_parallelize_3d_tile_1d_with_uarch function.
+	 */
+	uint32_t default_uarch_index;
+	/**
+	 * Copy of the max_uarch_index argument passed to the pthreadpool_parallelize_3d_tile_1d_with_uarch function.
+	 */
+	uint32_t max_uarch_index;
+	/**
+	 * Copy of the range_k argument passed to the pthreadpool_parallelize_3d_tile_1d_with_uarch function.
+	 */
+	size_t range_k;
+	/**
+	 * Copy of the tile_k argument passed to the pthreadpool_parallelize_3d_tile_1d_with_uarch function.
+	 */
+	size_t tile_k;
+	/**
+	 * FXdiv divisor for the range_j argument passed to the pthreadpool_parallelize_3d_tile_1d_with_uarch function.
+	 */
+	struct fxdiv_divisor_size_t range_j;
+	/**
+	 * FXdiv divisor for the divide_round_up(range_k, tile_k) value.
+	 */
+	struct fxdiv_divisor_size_t tile_range_k;
+};
+
 struct pthreadpool_3d_tile_2d_params {
 	/**
 	 * Copy of the range_j argument passed to the pthreadpool_parallelize_3d_tile_2d function.
@@ -655,6 +682,7 @@ struct PTHREADPOOL_CACHELINE_ALIGNED pthreadpool {
 		struct pthreadpool_2d_tile_2d_with_uarch_params parallelize_2d_tile_2d_with_uarch;
 		struct pthreadpool_3d_params parallelize_3d;
 		struct pthreadpool_3d_tile_1d_params parallelize_3d_tile_1d;
+		struct pthreadpool_3d_tile_1d_with_uarch_params parallelize_3d_tile_1d_with_uarch;
 		struct pthreadpool_3d_tile_2d_params parallelize_3d_tile_2d;
 		struct pthreadpool_3d_tile_2d_with_uarch_params parallelize_3d_tile_2d_with_uarch;
 		struct pthreadpool_4d_params parallelize_4d;
@@ -795,6 +823,10 @@ PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_3d_fastpath(
 	struct thread_info* thread);
 
 PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_3d_tile_1d_fastpath(
+	struct pthreadpool* threadpool,
+	struct thread_info* thread);
+
+PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_3d_tile_1d_with_uarch_fastpath(
 	struct pthreadpool* threadpool,
 	struct thread_info* thread);
 
