@@ -475,7 +475,7 @@ void pthreadpool_parallelize_2d_tile_2d_with_uarch(
 	uint32_t flags);
 
 /**
- * Process items on a 3D grid with the specified maximum tile size along the
+ * Process items on a 3D grid.
  *
  * The function implements a parallel version of the following snippet:
  *
@@ -555,7 +555,7 @@ void pthreadpool_parallelize_3d_tile_1d(
 	uint32_t flags);
 
 /**
- * Process items on a 3D grid.
+ * Process items on a 3D grid with the specified maximum tile size along the
  * last grid dimension using a microarchitecture-aware task function.
  *
  * The function implements a parallel version of the following snippet:
