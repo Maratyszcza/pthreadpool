@@ -27,6 +27,7 @@ typedef void (*pthreadpool_task_6d_tile_2d_t)(void*, size_t, size_t, size_t, siz
 typedef void (*pthreadpool_task_1d_with_id_t)(void*, uint32_t, size_t);
 typedef void (*pthreadpool_task_2d_tile_1d_with_id_t)(void*, uint32_t, size_t, size_t, size_t);
 typedef void (*pthreadpool_task_2d_tile_2d_with_id_t)(void*, uint32_t, size_t, size_t, size_t, size_t);
+typedef void (*pthreadpool_task_3d_tile_1d_with_id_t)(void*, uint32_t, size_t, size_t, size_t, size_t);
 typedef void (*pthreadpool_task_3d_tile_2d_with_id_t)(void*, uint32_t, size_t, size_t, size_t, size_t, size_t);
 typedef void (*pthreadpool_task_4d_tile_2d_with_id_t)(void*, uint32_t, size_t, size_t, size_t, size_t, size_t, size_t);
 
@@ -474,7 +475,7 @@ void pthreadpool_parallelize_2d_tile_2d_with_uarch(
 	uint32_t flags);
 
 /**
- * Process items on a 3D grid.
+ * Process items on a 3D grid with the specified maximum tile size along the
  *
  * The function implements a parallel version of the following snippet:
  *
@@ -547,6 +548,64 @@ void pthreadpool_parallelize_3d_tile_1d(
 	pthreadpool_t threadpool,
 	pthreadpool_task_3d_tile_1d_t function,
 	void* context,
+	size_t range_i,
+	size_t range_j,
+	size_t range_k,
+	size_t tile_k,
+	uint32_t flags);
+
+/**
+ * Process items on a 3D grid.
+ * last grid dimension using a microarchitecture-aware task function.
+ *
+ * The function implements a parallel version of the following snippet:
+ *
+ *   uint32_t uarch_index = cpuinfo_initialize() ?
+ *       cpuinfo_get_current_uarch_index() : default_uarch_index;
+ *   if (uarch_index > max_uarch_index) uarch_index = default_uarch_index;
+ *   for (size_t i = 0; i < range_i; i++)
+ *     for (size_t j = 0; j < range_j; j++)
+ *       for (size_t k = 0; k < range_k; k += tile_k)
+ *         function(context, uarch_index, i, j, k, min(range_k - k, tile_k));
+ *
+ * When the function returns, all items have been processed and the thread pool
+ * is ready for a new task.
+ *
+ * @note If multiple threads call this function with the same thread pool, the
+ *    calls are serialized.
+ *
+ * @param threadpool           the thread pool to use for parallelisation. If
+ *    threadpool is NULL, all items are processed serially on the calling
+ *    thread.
+ * @param function             the function to call for each tile.
+ * @param context              the first argument passed to the specified
+ *    function.
+ * @param default_uarch_index  the microarchitecture index to use when
+ *    pthreadpool is configured without cpuinfo, cpuinfo initialization failed,
+ *    or index returned by cpuinfo_get_current_uarch_index() exceeds the
+ *    max_uarch_index value.
+ * @param max_uarch_index      the maximum microarchitecture index expected by
+ *    the specified function. If the index returned by
+ *    cpuinfo_get_current_uarch_index() exceeds this value, default_uarch_index
+ *    will be used instead. default_uarch_index can exceed max_uarch_index.
+ * @param range_i              the number of items to process along the first
+ *    dimension of the 3D grid.
+ * @param range_j              the number of items to process along the second
+ *    dimension of the 3D grid.
+ * @param range_k              the number of items to process along the third
+ *    dimension of the 3D grid.
+ * @param tile_k               the maximum number of items along the third
+ *    dimension of the 3D grid to process in one function call.
+ * @param flags                a bitwise combination of zero or more optional
+ *    flags (PTHREADPOOL_FLAG_DISABLE_DENORMALS or
+ *    PTHREADPOOL_FLAG_YIELD_WORKERS)
+ */
+void pthreadpool_parallelize_3d_tile_1d_with_uarch(
+	pthreadpool_t threadpool,
+	pthreadpool_task_3d_tile_1d_with_id_t function,
+	void* context,
+	uint32_t default_uarch_index,
+	uint32_t max_uarch_index,
 	size_t range_i,
 	size_t range_j,
 	size_t range_k,
