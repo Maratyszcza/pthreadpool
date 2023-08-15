@@ -2332,8 +2332,6 @@ TEST(Parallelize2DTile1DWithUArchWithThread, MultiThreadPoolThreadIndexValid) {
 
 	size_t num_threads = pthreadpool_get_threads_count(threadpool.get());
 
-	std::vector<std::atomic_int> thread_indices(kParallelize2DTile1DRangeI * kParallelize2DTile1DRangeJ);
-
 	pthreadpool_parallelize_2d_tile_1d_with_uarch_with_thread(
 		threadpool.get(),
 		reinterpret_cast<pthreadpool_task_2d_tile_1d_with_id_with_thread_t>(SetThreadTrue2DTile1DWithUArchWithThread),
@@ -4127,6 +4125,426 @@ TEST(Parallelize3DTile1DWithUArch, MultiThreadPoolWorkStealing) {
 		kParallelize3DTile1DTileK,
 		0 /* flags */);
 	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize3DTile1DRangeI * kParallelize3DTile1DRangeJ * kParallelize3DTile1DRangeK);
+}
+
+static void ComputeNothing3DTile1DWithUArchWithThread(void*, uint32_t, size_t, size_t, size_t, size_t, size_t) {
+}
+
+TEST(Parallelize3DTile1DWithUArchWithThread, SingleThreadPoolCompletes) {
+	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+
+	pthreadpool_parallelize_3d_tile_1d_with_uarch_with_thread(threadpool.get(),
+		ComputeNothing3DTile1DWithUArchWithThread,
+		nullptr,
+		kDefaultUArchIndex, kMaxUArchIndex,
+		kParallelize3DTile1DRangeI, kParallelize3DTile1DRangeJ, kParallelize3DTile1DRangeK,
+		kParallelize3DTile1DTileK,
+		0 /* flags */);
+}
+
+TEST(Parallelize3DTile1DWithUArchWithThread, MultiThreadPoolCompletes) {
+	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+
+	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
+		GTEST_SKIP();
+	}
+
+	pthreadpool_parallelize_3d_tile_1d_with_uarch_with_thread(
+		threadpool.get(),
+		ComputeNothing3DTile1DWithUArchWithThread,
+		nullptr,
+		kDefaultUArchIndex, kMaxUArchIndex,
+		kParallelize3DTile1DRangeI, kParallelize3DTile1DRangeJ, kParallelize3DTile1DRangeK,
+		kParallelize3DTile1DTileK,
+		0 /* flags */);
+}
+
+static void CheckUArch3DTile1DWithUArchWithThread(void*, uint32_t uarch_index, size_t, size_t, size_t, size_t, size_t) {
+	if (uarch_index != kDefaultUArchIndex) {
+		EXPECT_LE(uarch_index, kMaxUArchIndex);
+	}
+}
+
+TEST(Parallelize3DTile1DWithUArchWithThread, SingleThreadPoolUArchInBounds) {
+	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+
+	pthreadpool_parallelize_3d_tile_1d_with_uarch_with_thread(
+		threadpool.get(),
+		CheckUArch3DTile1DWithUArchWithThread,
+		nullptr,
+		kDefaultUArchIndex, kMaxUArchIndex,
+		kParallelize3DTile1DRangeI, kParallelize3DTile1DRangeJ, kParallelize3DTile1DRangeK,
+		kParallelize3DTile1DTileK,
+		0 /* flags */);
+}
+
+TEST(Parallelize3DTile1DWithUArchWithThread, MultiThreadPoolUArchInBounds) {
+	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+
+	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
+		GTEST_SKIP();
+	}
+
+	pthreadpool_parallelize_3d_tile_1d_with_uarch_with_thread(
+		threadpool.get(),
+		CheckUArch3DTile1DWithUArchWithThread,
+		nullptr,
+		kDefaultUArchIndex, kMaxUArchIndex,
+		kParallelize3DTile1DRangeI, kParallelize3DTile1DRangeJ, kParallelize3DTile1DRangeK,
+		kParallelize3DTile1DTileK,
+		0 /* flags */);
+}
+
+static void CheckBounds3DTile1DWithUArchWithThread(void*, uint32_t, size_t, size_t i, size_t j, size_t start_k, size_t tile_k) {
+	EXPECT_LT(i, kParallelize3DTile1DRangeI);
+	EXPECT_LT(j, kParallelize3DTile1DRangeJ);
+	EXPECT_LT(start_k, kParallelize3DTile1DRangeK);
+	EXPECT_LE(start_k + tile_k, kParallelize3DTile1DRangeK);
+}
+
+TEST(Parallelize3DTile1DWithUArchWithThread, SingleThreadPoolAllItemsInBounds) {
+	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+
+	pthreadpool_parallelize_3d_tile_1d_with_uarch_with_thread(
+		threadpool.get(),
+		CheckBounds3DTile1DWithUArchWithThread,
+		nullptr,
+		kDefaultUArchIndex, kMaxUArchIndex,
+		kParallelize3DTile1DRangeI, kParallelize3DTile1DRangeJ, kParallelize3DTile1DRangeK,
+		kParallelize3DTile1DTileK,
+		0 /* flags */);
+}
+
+TEST(Parallelize3DTile1DWithUArchWithThread, MultiThreadPoolAllItemsInBounds) {
+	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+
+	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
+		GTEST_SKIP();
+	}
+
+	pthreadpool_parallelize_3d_tile_1d_with_uarch_with_thread(
+		threadpool.get(),
+		CheckBounds3DTile1DWithUArchWithThread,
+		nullptr,
+		kDefaultUArchIndex, kMaxUArchIndex,
+		kParallelize3DTile1DRangeI, kParallelize3DTile1DRangeJ, kParallelize3DTile1DRangeK,
+		kParallelize3DTile1DTileK,
+		0 /* flags */);
+}
+
+static void CheckTiling3DTile1DWithUArchWithThread(void*, uint32_t, size_t, size_t i, size_t j, size_t start_k, size_t tile_k) {
+	EXPECT_GT(tile_k, 0);
+	EXPECT_LE(tile_k, kParallelize3DTile1DTileK);
+	EXPECT_EQ(start_k % kParallelize3DTile1DTileK, 0);
+	EXPECT_EQ(tile_k, std::min<size_t>(kParallelize3DTile1DTileK, kParallelize3DTile1DRangeK - start_k));
+}
+
+TEST(Parallelize3DTile1DWithUArchWithThread, SingleThreadPoolUniformTiling) {
+	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+
+	pthreadpool_parallelize_3d_tile_1d_with_uarch_with_thread(
+		threadpool.get(),
+		CheckTiling3DTile1DWithUArchWithThread,
+		nullptr,
+		kDefaultUArchIndex, kMaxUArchIndex,
+		kParallelize3DTile1DRangeI, kParallelize3DTile1DRangeJ, kParallelize3DTile1DRangeK,
+		kParallelize3DTile1DTileK,
+		0 /* flags */);
+}
+
+TEST(Parallelize3DTile1DWithUArchWithThread, MultiThreadPoolUniformTiling) {
+	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+
+	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
+		GTEST_SKIP();
+	}
+
+	pthreadpool_parallelize_3d_tile_1d_with_uarch_with_thread(
+		threadpool.get(),
+		CheckTiling3DTile1DWithUArchWithThread,
+		nullptr,
+		kDefaultUArchIndex, kMaxUArchIndex,
+		kParallelize3DTile1DRangeI, kParallelize3DTile1DRangeJ, kParallelize3DTile1DRangeK,
+		kParallelize3DTile1DTileK,
+		0 /* flags */);
+}
+
+static void SetTrue3DTile1DWithUArchWithThread(std::atomic_bool* processed_indicators, uint32_t, size_t, size_t i, size_t j, size_t start_k, size_t tile_k) {
+	for (size_t k = start_k; k < start_k + tile_k; k++) {
+		const size_t linear_idx = (i * kParallelize3DTile1DRangeJ + j) * kParallelize3DTile1DRangeK + k;
+		processed_indicators[linear_idx].store(true, std::memory_order_relaxed);
+	}
+}
+
+TEST(Parallelize3DTile1DWithUArchWithThread, SingleThreadPoolAllItemsProcessed) {
+	std::vector<std::atomic_bool> indicators(kParallelize3DTile1DRangeI * kParallelize3DTile1DRangeJ * kParallelize3DTile1DRangeK);
+
+	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+
+	pthreadpool_parallelize_3d_tile_1d_with_uarch_with_thread(
+		threadpool.get(),
+		reinterpret_cast<pthreadpool_task_3d_tile_1d_with_id_with_thread_t>(SetTrue3DTile1DWithUArchWithThread),
+		static_cast<void*>(indicators.data()),
+		kDefaultUArchIndex, kMaxUArchIndex,
+		kParallelize3DTile1DRangeI, kParallelize3DTile1DRangeJ, kParallelize3DTile1DRangeK,
+		kParallelize3DTile1DTileK,
+		0 /* flags */);
+
+	for (size_t i = 0; i < kParallelize3DTile1DRangeI; i++) {
+		for (size_t j = 0; j < kParallelize3DTile1DRangeJ; j++) {
+			for (size_t k = 0; k < kParallelize3DTile1DRangeK; k++) {
+				const size_t linear_idx = (i * kParallelize3DTile1DRangeJ + j) * kParallelize3DTile1DRangeK + k;
+				EXPECT_TRUE(indicators[linear_idx].load(std::memory_order_relaxed))
+					<< "Element (" << i << ", " << j << ", " << k << ") not processed";
+			}
+		}
+	}
+}
+
+TEST(Parallelize3DTile1DWithUArchWithThread, MultiThreadPoolAllItemsProcessed) {
+	std::vector<std::atomic_bool> indicators(kParallelize3DTile1DRangeI * kParallelize3DTile1DRangeJ * kParallelize3DTile1DRangeK);
+
+	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+
+	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
+		GTEST_SKIP();
+	}
+
+	pthreadpool_parallelize_3d_tile_1d_with_uarch_with_thread(
+		threadpool.get(),
+		reinterpret_cast<pthreadpool_task_3d_tile_1d_with_id_with_thread_t>(SetTrue3DTile1DWithUArchWithThread),
+		static_cast<void*>(indicators.data()),
+		kDefaultUArchIndex, kMaxUArchIndex,
+		kParallelize3DTile1DRangeI, kParallelize3DTile1DRangeJ, kParallelize3DTile1DRangeK,
+		kParallelize3DTile1DTileK,
+		0 /* flags */);
+
+	for (size_t i = 0; i < kParallelize3DTile1DRangeI; i++) {
+		for (size_t j = 0; j < kParallelize3DTile1DRangeJ; j++) {
+			for (size_t k = 0; k < kParallelize3DTile1DRangeK; k++) {
+				const size_t linear_idx = (i * kParallelize3DTile1DRangeJ + j) * kParallelize3DTile1DRangeK + k;
+				EXPECT_TRUE(indicators[linear_idx].load(std::memory_order_relaxed))
+					<< "Element (" << i << ", " << j << ", " << k << ") not processed";
+			}
+		}
+	}
+}
+
+static void Increment3DTile1DWithUArchWithThread(std::atomic_int* processed_counters, uint32_t, size_t, size_t i, size_t j, size_t start_k, size_t tile_k) {
+	for (size_t k = start_k; k < start_k + tile_k; k++) {
+		const size_t linear_idx = (i * kParallelize3DTile1DRangeJ + j) * kParallelize3DTile1DRangeK + k;
+		processed_counters[linear_idx].fetch_add(1, std::memory_order_relaxed);
+	}
+}
+
+TEST(Parallelize3DTile1DWithUArchWithThread, SingleThreadPoolEachItemProcessedOnce) {
+	std::vector<std::atomic_int> counters(kParallelize3DTile1DRangeI * kParallelize3DTile1DRangeJ * kParallelize3DTile1DRangeK);
+
+	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+
+	pthreadpool_parallelize_3d_tile_1d_with_uarch_with_thread(
+		threadpool.get(),
+		reinterpret_cast<pthreadpool_task_3d_tile_1d_with_id_with_thread_t>(Increment3DTile1DWithUArchWithThread),
+		static_cast<void*>(counters.data()),
+		kDefaultUArchIndex, kMaxUArchIndex,
+		kParallelize3DTile1DRangeI, kParallelize3DTile1DRangeJ, kParallelize3DTile1DRangeK,
+		kParallelize3DTile1DTileK,
+		0 /* flags */);
+
+	for (size_t i = 0; i < kParallelize3DTile1DRangeI; i++) {
+		for (size_t j = 0; j < kParallelize3DTile1DRangeJ; j++) {
+			for (size_t k = 0; k < kParallelize3DTile1DRangeK; k++) {
+				const size_t linear_idx = (i * kParallelize3DTile1DRangeJ + j) * kParallelize3DTile1DRangeK + k;
+				EXPECT_EQ(counters[linear_idx].load(std::memory_order_relaxed), 1)
+					<< "Element (" << i << ", " << j << ", " << k << ") was processed "
+					<< counters[linear_idx].load(std::memory_order_relaxed) << " times (expected: 1)";
+			}
+		}
+	}
+}
+
+TEST(Parallelize3DTile1DWithUArchWithThread, MultiThreadPoolEachItemProcessedOnce) {
+	std::vector<std::atomic_int> counters(kParallelize3DTile1DRangeI * kParallelize3DTile1DRangeJ * kParallelize3DTile1DRangeK);
+
+	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+
+	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
+		GTEST_SKIP();
+	}
+
+	pthreadpool_parallelize_3d_tile_1d_with_uarch_with_thread(
+		threadpool.get(),
+		reinterpret_cast<pthreadpool_task_3d_tile_1d_with_id_with_thread_t>(Increment3DTile1DWithUArchWithThread),
+		static_cast<void*>(counters.data()),
+		kDefaultUArchIndex, kMaxUArchIndex,
+		kParallelize3DTile1DRangeI, kParallelize3DTile1DRangeJ, kParallelize3DTile1DRangeK,
+		kParallelize3DTile1DTileK,
+		0 /* flags */);
+
+	for (size_t i = 0; i < kParallelize3DTile1DRangeI; i++) {
+		for (size_t j = 0; j < kParallelize3DTile1DRangeJ; j++) {
+			for (size_t k = 0; k < kParallelize3DTile1DRangeK; k++) {
+				const size_t linear_idx = (i * kParallelize3DTile1DRangeJ + j) * kParallelize3DTile1DRangeK + k;
+				EXPECT_EQ(counters[linear_idx].load(std::memory_order_relaxed), 1)
+					<< "Element (" << i << ", " << j << ", " << k << ") was processed "
+					<< counters[linear_idx].load(std::memory_order_relaxed) << " times (expected: 1)";
+			}
+		}
+	}
+}
+
+TEST(Parallelize3DTile1DWithUArchWithThread, SingleThreadPoolEachItemProcessedMultipleTimes) {
+	std::vector<std::atomic_int> counters(kParallelize3DTile1DRangeI * kParallelize3DTile1DRangeJ * kParallelize3DTile1DRangeK);
+
+	auto_pthreadpool_t threadpool(pthreadpool_create(1), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+
+	for (size_t iteration = 0; iteration < kIncrementIterations; iteration++) {
+		pthreadpool_parallelize_3d_tile_1d_with_uarch_with_thread(
+			threadpool.get(),
+			reinterpret_cast<pthreadpool_task_3d_tile_1d_with_id_with_thread_t>(Increment3DTile1DWithUArchWithThread),
+			static_cast<void*>(counters.data()),
+			kDefaultUArchIndex, kMaxUArchIndex,
+			kParallelize3DTile1DRangeI, kParallelize3DTile1DRangeJ, kParallelize3DTile1DRangeK,
+			kParallelize3DTile1DTileK,
+			0 /* flags */);
+	}
+
+	for (size_t i = 0; i < kParallelize3DTile1DRangeI; i++) {
+		for (size_t j = 0; j < kParallelize3DTile1DRangeJ; j++) {
+			for (size_t k = 0; k < kParallelize3DTile1DRangeK; k++) {
+				const size_t linear_idx = (i * kParallelize3DTile1DRangeJ + j) * kParallelize3DTile1DRangeK + k;
+				EXPECT_EQ(counters[linear_idx].load(std::memory_order_relaxed), kIncrementIterations)
+					<< "Element (" << i << ", " << j << ", " << k << ") was processed "
+					<< counters[linear_idx].load(std::memory_order_relaxed) << " times "
+					<< "(expected: " << kIncrementIterations << ")";
+			}
+		}
+	}
+}
+
+TEST(Parallelize3DTile1DWithUArchWithThread, MultiThreadPoolEachItemProcessedMultipleTimes) {
+	std::vector<std::atomic_int> counters(kParallelize3DTile1DRangeI * kParallelize3DTile1DRangeJ * kParallelize3DTile1DRangeK);
+
+	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+
+	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
+		GTEST_SKIP();
+	}
+
+	for (size_t iteration = 0; iteration < kIncrementIterations; iteration++) {
+		pthreadpool_parallelize_3d_tile_1d_with_uarch_with_thread(
+			threadpool.get(),
+			reinterpret_cast<pthreadpool_task_3d_tile_1d_with_id_with_thread_t>(Increment3DTile1DWithUArchWithThread),
+			static_cast<void*>(counters.data()),
+			kDefaultUArchIndex, kMaxUArchIndex,
+			kParallelize3DTile1DRangeI, kParallelize3DTile1DRangeJ, kParallelize3DTile1DRangeK,
+			kParallelize3DTile1DTileK,
+			0 /* flags */);
+	}
+
+	for (size_t i = 0; i < kParallelize3DTile1DRangeI; i++) {
+		for (size_t j = 0; j < kParallelize3DTile1DRangeJ; j++) {
+			for (size_t k = 0; k < kParallelize3DTile1DRangeK; k++) {
+				const size_t linear_idx = (i * kParallelize3DTile1DRangeJ + j) * kParallelize3DTile1DRangeK + k;
+				EXPECT_EQ(counters[linear_idx].load(std::memory_order_relaxed), kIncrementIterations)
+					<< "Element (" << i << ", " << j << ", " << k << ") was processed "
+					<< counters[linear_idx].load(std::memory_order_relaxed) << " times "
+					<< "(expected: " << kIncrementIterations << ")";
+			}
+		}
+	}
+}
+
+static void IncrementSame3DTile1DWithUArchWithThread(std::atomic_int* num_processed_items, uint32_t, size_t, size_t i, size_t j, size_t start_k, size_t tile_k) {
+	for (size_t k = start_k; k < start_k + tile_k; k++) {
+		num_processed_items->fetch_add(1, std::memory_order_relaxed);
+	}
+}
+
+TEST(Parallelize3DTile1DWithUArchWithThread, MultiThreadPoolHighContention) {
+	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
+
+	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+
+	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
+		GTEST_SKIP();
+	}
+
+	pthreadpool_parallelize_3d_tile_1d_with_uarch_with_thread(
+		threadpool.get(),
+		reinterpret_cast<pthreadpool_task_3d_tile_1d_with_id_with_thread_t>(IncrementSame3DTile1DWithUArchWithThread),
+		static_cast<void*>(&num_processed_items),
+		kDefaultUArchIndex, kMaxUArchIndex,
+		kParallelize3DTile1DRangeI, kParallelize3DTile1DRangeJ, kParallelize3DTile1DRangeK,
+		kParallelize3DTile1DTileK,
+		0 /* flags */);
+	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize3DTile1DRangeI * kParallelize3DTile1DRangeJ * kParallelize3DTile1DRangeK);
+}
+
+static void WorkImbalance3DTile1DWithUArchWithThread(std::atomic_int* num_processed_items, uint32_t, size_t, size_t i, size_t j, size_t start_k, size_t tile_k) {
+	num_processed_items->fetch_add(tile_k, std::memory_order_relaxed);
+	if (i == 0 && j == 0 && start_k == 0) {
+		/* Spin-wait until all items are computed */
+		while (num_processed_items->load(std::memory_order_relaxed) != kParallelize3DTile1DRangeI * kParallelize3DTile1DRangeJ * kParallelize3DTile1DRangeK) {
+			std::atomic_thread_fence(std::memory_order_acquire);
+		}
+	}
+}
+
+TEST(Parallelize3DTile1DWithUArchWithThread, MultiThreadPoolWorkStealing) {
+	std::atomic_int num_processed_items = ATOMIC_VAR_INIT(0);
+
+	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+
+	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
+		GTEST_SKIP();
+	}
+
+	pthreadpool_parallelize_3d_tile_1d_with_uarch_with_thread(
+		threadpool.get(),
+		reinterpret_cast<pthreadpool_task_3d_tile_1d_with_id_with_thread_t>(WorkImbalance3DTile1DWithUArchWithThread),
+		static_cast<void*>(&num_processed_items),
+		kDefaultUArchIndex, kMaxUArchIndex,
+		kParallelize3DTile1DRangeI, kParallelize3DTile1DRangeJ, kParallelize3DTile1DRangeK,
+		kParallelize3DTile1DTileK,
+		0 /* flags */);
+	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize3DTile1DRangeI * kParallelize3DTile1DRangeJ * kParallelize3DTile1DRangeK);
+}
+
+static void SetThreadTrue3DTile1DWithUArchWithThread(const size_t* num_threads, uint32_t, size_t thread_index, size_t i, size_t j, size_t start_k, size_t tile_k) {
+	EXPECT_LE(thread_index, *num_threads);
+}
+
+TEST(Parallelize3DTile1DWithUArchWithThread, MultiThreadPoolThreadIndexValid) {
+	auto_pthreadpool_t threadpool(pthreadpool_create(0), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+
+	size_t num_threads = pthreadpool_get_threads_count(threadpool.get());
+
+	pthreadpool_parallelize_3d_tile_1d_with_uarch_with_thread(
+		threadpool.get(),
+		reinterpret_cast<pthreadpool_task_3d_tile_1d_with_id_with_thread_t>(SetThreadTrue3DTile1DWithUArchWithThread),
+		static_cast<void*>(&num_threads),
+		kDefaultUArchIndex, kMaxUArchIndex,
+		kParallelize3DTile1DRangeI, kParallelize3DTile1DRangeJ, kParallelize3DTile1DRangeK,
+		kParallelize3DTile1DTileK,
+		0 /* flags */);
 }
 
 static void ComputeNothing3DTile2D(void*, size_t, size_t, size_t, size_t, size_t) {

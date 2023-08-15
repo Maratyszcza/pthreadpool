@@ -598,6 +598,68 @@ static void thread_parallelize_3d_tile_1d_with_uarch(struct pthreadpool* threadp
 	pthreadpool_fence_release();
 }
 
+static void thread_parallelize_3d_tile_1d_with_uarch_with_thread(struct pthreadpool* threadpool, struct thread_info* thread) {
+	assert(threadpool != NULL);
+	assert(thread != NULL);
+
+	const pthreadpool_task_3d_tile_1d_with_id_with_thread_t task =
+		(pthreadpool_task_3d_tile_1d_with_id_with_thread_t) pthreadpool_load_relaxed_void_p(&threadpool->task);
+	void *const argument = pthreadpool_load_relaxed_void_p(&threadpool->argument);
+
+	const uint32_t default_uarch_index = threadpool->params.parallelize_3d_tile_1d_with_uarch.default_uarch_index;
+	uint32_t uarch_index = default_uarch_index;
+	#if PTHREADPOOL_USE_CPUINFO
+		uarch_index = cpuinfo_get_current_uarch_index_with_default(default_uarch_index);
+		if (uarch_index > threadpool->params.parallelize_3d_tile_1d_with_uarch.max_uarch_index) {
+			uarch_index = default_uarch_index;
+		}
+	#endif
+
+	/* Process thread's own range of items */
+	const size_t range_start = pthreadpool_load_relaxed_size_t(&thread->range_start);
+	const struct fxdiv_divisor_size_t tile_range_k = threadpool->params.parallelize_3d_tile_1d_with_uarch.tile_range_k;
+	const struct fxdiv_result_size_t tile_index_ij_k = fxdiv_divide_size_t(range_start, tile_range_k);
+	const struct fxdiv_divisor_size_t range_j = threadpool->params.parallelize_3d_tile_1d_with_uarch.range_j;
+	const struct fxdiv_result_size_t index_i_j = fxdiv_divide_size_t(tile_index_ij_k.quotient, range_j);
+	const size_t tile_k = threadpool->params.parallelize_3d_tile_1d_with_uarch.tile_k;
+	size_t i = index_i_j.quotient;
+	size_t j = index_i_j.remainder;
+	size_t start_k = tile_index_ij_k.remainder * tile_k;
+
+	const size_t thread_number = thread->thread_number;
+	const size_t range_k = threadpool->params.parallelize_3d_tile_1d_with_uarch.range_k;
+	while (pthreadpool_try_decrement_relaxed_size_t(&thread->range_length)) {
+		task(argument, uarch_index, thread_number, i, j, start_k, min(range_k - start_k, tile_k));
+		start_k += tile_k;
+		if (start_k >= range_k) {
+			start_k = 0;
+			if (++j == range_j.value) {
+				j = 0;
+				i += 1;
+			}
+		}
+	}
+
+	/* There still may be other threads with work */
+	const size_t threads_count = threadpool->threads_count.value;
+	for (size_t tid = modulo_decrement(thread_number, threads_count);
+		tid != thread_number;
+		tid = modulo_decrement(tid, threads_count))
+	{
+		struct thread_info* other_thread = &threadpool->threads[tid];
+		while (pthreadpool_try_decrement_relaxed_size_t(&other_thread->range_length)) {
+			const size_t linear_index = pthreadpool_decrement_fetch_relaxed_size_t(&other_thread->range_end);
+			const struct fxdiv_result_size_t tile_index_ij_k = fxdiv_divide_size_t(linear_index, tile_range_k);
+			const struct fxdiv_result_size_t index_i_j = fxdiv_divide_size_t(tile_index_ij_k.quotient, range_j);
+			const size_t start_k = tile_index_ij_k.remainder * tile_k;
+			task(argument, uarch_index, tid, index_i_j.quotient, index_i_j.remainder, start_k, min(range_k - start_k, tile_k));
+		}
+	}
+
+	/* Make changes by this thread visible to other threads */
+	pthreadpool_fence_release();
+}
+
 static void thread_parallelize_3d_tile_2d(struct pthreadpool* threadpool, struct thread_info* thread) {
 	assert(threadpool != NULL);
 	assert(thread != NULL);
@@ -1998,6 +2060,69 @@ void pthreadpool_parallelize_3d_tile_1d_with_uarch(
 		#endif
 		pthreadpool_parallelize(
 			threadpool, parallelize_3d_tile_1d_with_uarch, &params, sizeof(params),
+			task, argument, tile_range, flags);
+	}
+}
+
+void pthreadpool_parallelize_3d_tile_1d_with_uarch_with_thread(
+	pthreadpool_t threadpool,
+	pthreadpool_task_3d_tile_1d_with_id_with_thread_t task,
+	void* argument,
+	uint32_t default_uarch_index,
+	uint32_t max_uarch_index,
+	size_t range_i,
+	size_t range_j,
+	size_t range_k,
+	size_t tile_k,
+	uint32_t flags)
+{
+	size_t threads_count;
+	if (threadpool == NULL || (threads_count = threadpool->threads_count.value) <= 1 || ((range_i | range_j) <= 1 && range_k <= tile_k)) {
+		/* No thread pool used: execute task sequentially on the calling thread */
+
+		uint32_t uarch_index = default_uarch_index;
+		#if PTHREADPOOL_USE_CPUINFO
+			uarch_index = cpuinfo_get_current_uarch_index_with_default(default_uarch_index);
+			if (uarch_index > max_uarch_index) {
+				uarch_index = default_uarch_index;
+			}
+		#endif
+
+		struct fpu_state saved_fpu_state = { 0 };
+		if (flags & PTHREADPOOL_FLAG_DISABLE_DENORMALS) {
+			saved_fpu_state = get_fpu_state();
+			disable_fpu_denormals();
+		}
+		for (size_t i = 0; i < range_i; i++) {
+			for (size_t j = 0; j < range_j; j++) {
+				for (size_t k = 0; k < range_k; k += tile_k) {
+					task(argument, uarch_index, 0, i, j, k, min(range_k - k, tile_k));
+				}
+			}
+		}
+		if (flags & PTHREADPOOL_FLAG_DISABLE_DENORMALS) {
+			set_fpu_state(saved_fpu_state);
+		}
+	} else {
+		const size_t tile_range_k = divide_round_up(range_k, tile_k);
+		const size_t tile_range = range_i * range_j * tile_range_k;
+		const struct pthreadpool_3d_tile_1d_with_uarch_params params = {
+			.default_uarch_index = default_uarch_index,
+			.max_uarch_index = max_uarch_index,
+			.range_k = range_k,
+			.tile_k = tile_k,
+			.range_j = fxdiv_init_size_t(range_j),
+			.tile_range_k = fxdiv_init_size_t(tile_range_k),
+		};
+		thread_function_t parallelize_3d_tile_1d_with_uarch_with_thread = &thread_parallelize_3d_tile_1d_with_uarch_with_thread;
+		#if PTHREADPOOL_USE_FASTPATH
+			const size_t range_threshold = -threads_count;
+			if (tile_range < range_threshold) {
+				parallelize_3d_tile_1d_with_uarch_with_thread = &pthreadpool_thread_parallelize_3d_tile_1d_with_uarch_with_thread_fastpath;
+			}
+		#endif
+		pthreadpool_parallelize(
+			threadpool, parallelize_3d_tile_1d_with_uarch_with_thread, &params, sizeof(params),
 			task, argument, tile_range, flags);
 	}
 }
