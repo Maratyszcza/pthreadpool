@@ -826,6 +826,10 @@ PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_3d_tile_1d_fastpath(
 	struct pthreadpool* threadpool,
 	struct thread_info* thread);
 
+PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_3d_tile_1d_with_thread_fastpath(
+	struct pthreadpool* threadpool,
+	struct thread_info* thread);
+
 PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_3d_tile_1d_with_uarch_fastpath(
 	struct pthreadpool* threadpool,
 	struct thread_info* thread);

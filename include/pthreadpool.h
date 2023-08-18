@@ -13,6 +13,7 @@ typedef void (*pthreadpool_task_2d_tile_1d_t)(void*, size_t, size_t, size_t);
 typedef void (*pthreadpool_task_2d_tile_2d_t)(void*, size_t, size_t, size_t, size_t);
 typedef void (*pthreadpool_task_3d_t)(void*, size_t, size_t, size_t);
 typedef void (*pthreadpool_task_3d_tile_1d_t)(void*, size_t, size_t, size_t, size_t);
+typedef void (*pthreadpool_task_3d_tile_1d_with_thread_t)(void*, size_t, size_t, size_t, size_t, size_t);
 typedef void (*pthreadpool_task_3d_tile_2d_t)(void*, size_t, size_t, size_t, size_t, size_t);
 typedef void (*pthreadpool_task_4d_t)(void*, size_t, size_t, size_t, size_t);
 typedef void (*pthreadpool_task_4d_tile_1d_t)(void*, size_t, size_t, size_t, size_t, size_t);
@@ -554,6 +555,48 @@ void pthreadpool_parallelize_3d_tile_1d(
 	size_t range_k,
 	size_t tile_k,
 	uint32_t flags);
+
+/**
+ * Process items on a 3D grid with the specified maximum tile size along the
+ * last grid dimension and passing along the current thread id.
+ *
+ * The function implements a parallel version of the following snippet:
+ *
+ *   for (size_t i = 0; i < range_i; i++)
+ *     for (size_t j = 0; j < range_j; j++)
+ *       for (size_t k = 0; k < range_k; k += tile_k)
+ *         function(context, thread_index, i, j, k, min(range_k - k, tile_k));
+ *
+ * When the function returns, all items have been processed and the thread pool
+ * is ready for a new task.
+ *
+ * @note If multiple threads call this function with the same thread pool, the
+ *    calls are serialized.
+ *
+ * @param threadpool  the thread pool to use for parallelisation. If threadpool
+ *    is NULL, all items are processed serially on the calling thread.
+ * @param function    the function to call for each tile.
+ * @param context     the first argument passed to the specified function.
+ * @param range_i     the number of items to process along the first dimension
+ *    of the 3D grid.
+ * @param range_j     the number of items to process along the second dimension
+ *    of the 3D grid.
+ * @param range_k     the number of items to process along the third dimension
+ *    of the 3D grid.
+ * @param tile_k      the maximum number of items along the third dimension of
+ *    the 3D grid to process in one function call.
+ * @param flags       a bitwise combination of zero or more optional flags
+ *    (PTHREADPOOL_FLAG_DISABLE_DENORMALS or PTHREADPOOL_FLAG_YIELD_WORKERS)
+ */
+void pthreadpool_parallelize_3d_tile_1d_with_thread(
+  pthreadpool_t threadpool,
+  pthreadpool_task_3d_tile_1d_with_thread_t function,
+  void* context,
+  size_t range_i,
+  size_t range_j,
+  size_t range_k,
+  size_t tile_k,
+  uint32_t flags);
 
 /**
  * Process items on a 3D grid with the specified maximum tile size along the
