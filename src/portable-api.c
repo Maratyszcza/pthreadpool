@@ -324,7 +324,7 @@ static void thread_parallelize_2d_tile_1d_with_uarch_with_thread(struct pthreadp
 			const size_t linear_index = pthreadpool_decrement_fetch_relaxed_size_t(&other_thread->range_end);
 			const struct fxdiv_result_size_t tile_index_i_j = fxdiv_divide_size_t(linear_index, tile_range_j);
 			const size_t start_j = tile_index_i_j.remainder * tile_j;
-			task(argument, uarch_index, tid, tile_index_i_j.quotient, start_j, min(range_j - start_j, tile_j));
+			task(argument, uarch_index, thread_number, tile_index_i_j.quotient, start_j, min(range_j - start_j, tile_j));
 		}
 	}
 
@@ -581,7 +581,7 @@ static void thread_parallelize_3d_tile_1d_with_thread(struct pthreadpool* thread
 			const struct fxdiv_result_size_t tile_index_ij_k = fxdiv_divide_size_t(linear_index, tile_range_k);
 			const struct fxdiv_result_size_t index_i_j = fxdiv_divide_size_t(tile_index_ij_k.quotient, range_j);
 			const size_t start_k = tile_index_ij_k.remainder * tile_k;
-			task(argument, tid, index_i_j.quotient, index_i_j.remainder, start_k, min(range_k - start_k, tile_k));
+			task(argument, thread_number, index_i_j.quotient, index_i_j.remainder, start_k, min(range_k - start_k, tile_k));
 		}
 	}
 
@@ -704,7 +704,7 @@ static void thread_parallelize_3d_tile_1d_with_uarch_with_thread(struct pthreadp
 			const struct fxdiv_result_size_t tile_index_ij_k = fxdiv_divide_size_t(linear_index, tile_range_k);
 			const struct fxdiv_result_size_t index_i_j = fxdiv_divide_size_t(tile_index_ij_k.quotient, range_j);
 			const size_t start_k = tile_index_ij_k.remainder * tile_k;
-			task(argument, uarch_index, tid, index_i_j.quotient, index_i_j.remainder, start_k, min(range_k - start_k, tile_k));
+			task(argument, uarch_index, thread_number, index_i_j.quotient, index_i_j.remainder, start_k, min(range_k - start_k, tile_k));
 		}
 	}
 
