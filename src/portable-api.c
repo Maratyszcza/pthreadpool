@@ -60,6 +60,37 @@ static void thread_parallelize_1d(struct pthreadpool* threadpool, struct thread_
 	pthreadpool_fence_release();
 }
 
+static void thread_parallelize_1d_with_thread(struct pthreadpool* threadpool, struct thread_info* thread) {
+	assert(threadpool != NULL);
+	assert(thread != NULL);
+
+	const pthreadpool_task_1d_with_thread_t task = (pthreadpool_task_1d_with_thread_t) pthreadpool_load_relaxed_void_p(&threadpool->task);
+	void *const argument = pthreadpool_load_relaxed_void_p(&threadpool->argument);
+
+	const size_t thread_number = thread->thread_number;
+	/* Process thread's own range of items */
+	size_t range_start = pthreadpool_load_relaxed_size_t(&thread->range_start);
+	while (pthreadpool_try_decrement_relaxed_size_t(&thread->range_length)) {
+		task(argument, thread_number, range_start++);
+	}
+
+	/* There still may be other threads with work */
+	const size_t threads_count = threadpool->threads_count.value;
+	for (size_t tid = modulo_decrement(thread_number, threads_count);
+		tid != thread_number;
+		tid = modulo_decrement(tid, threads_count))
+	{
+		struct thread_info* other_thread = &threadpool->threads[tid];
+		while (pthreadpool_try_decrement_relaxed_size_t(&other_thread->range_length)) {
+			const size_t index = pthreadpool_decrement_fetch_relaxed_size_t(&other_thread->range_end);
+			task(argument, thread_number, index);
+		}
+	}
+
+	/* Make changes by this thread visible to other threads */
+	pthreadpool_fence_release();
+}
+
 static void thread_parallelize_1d_with_uarch(struct pthreadpool* threadpool, struct thread_info* thread) {
 	assert(threadpool != NULL);
 	assert(thread != NULL);
@@ -1543,6 +1574,41 @@ void pthreadpool_parallelize_1d(
 		#endif
 		pthreadpool_parallelize(
 			threadpool, parallelize_1d, NULL, 0,
+			(void*) task, argument, range, flags);
+	}
+}
+
+void pthreadpool_parallelize_1d_with_thread(
+	struct pthreadpool* threadpool,
+	pthreadpool_task_1d_with_thread_t task,
+	void* argument,
+	size_t range,
+	uint32_t flags)
+{
+	size_t threads_count;
+	if (threadpool == NULL || (threads_count = threadpool->threads_count.value) <= 1 || range <= 1) {
+		/* No thread pool used: execute task sequentially on the calling thread */
+		struct fpu_state saved_fpu_state = { 0 };
+		if (flags & PTHREADPOOL_FLAG_DISABLE_DENORMALS) {
+			saved_fpu_state = get_fpu_state();
+			disable_fpu_denormals();
+		}
+		for (size_t i = 0; i < range; i++) {
+			task(argument, 0, i);
+		}
+		if (flags & PTHREADPOOL_FLAG_DISABLE_DENORMALS) {
+			set_fpu_state(saved_fpu_state);
+		}
+	} else {
+		thread_function_t parallelize_1d_with_thread = &thread_parallelize_1d_with_thread;
+		#if PTHREADPOOL_USE_FASTPATH
+			const size_t range_threshold = -threads_count;
+			if (range < range_threshold) {
+				parallelize_1d_with_thread = &pthreadpool_thread_parallelize_1d_with_thread_fastpath;
+			}
+		#endif
+		pthreadpool_parallelize(
+			threadpool, parallelize_1d_with_thread, NULL, 0,
 			(void*) task, argument, range, flags);
 	}
 }
