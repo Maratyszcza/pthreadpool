@@ -38,6 +38,18 @@ void pthreadpool_parallelize_1d(
 	}
 }
 
+void pthreadpool_parallelize_1d_with_thread(
+	struct pthreadpool* threadpool,
+	pthreadpool_task_1d_with_thread_t task,
+	void* argument,
+	size_t range,
+	uint32_t flags)
+{
+	for (size_t i = 0; i < range; i++) {
+		task(argument, 0, i);
+	}
+}
+
 void pthreadpool_parallelize_1d_with_uarch(
 	pthreadpool_t threadpool,
 	pthreadpool_task_1d_with_id_t task,

@@ -7,6 +7,7 @@
 typedef struct pthreadpool* pthreadpool_t;
 
 typedef void (*pthreadpool_task_1d_t)(void*, size_t);
+typedef void (*pthreadpool_task_1d_with_thread_t)(void*, size_t, size_t);
 typedef void (*pthreadpool_task_1d_tile_1d_t)(void*, size_t, size_t);
 typedef void (*pthreadpool_task_2d_t)(void*, size_t, size_t);
 typedef void (*pthreadpool_task_2d_tile_1d_t)(void*, size_t, size_t, size_t);
@@ -117,6 +118,36 @@ size_t pthreadpool_get_threads_count(pthreadpool_t threadpool);
 void pthreadpool_parallelize_1d(
 	pthreadpool_t threadpool,
 	pthreadpool_task_1d_t function,
+	void* context,
+	size_t range,
+	uint32_t flags);
+
+/**
+ * Process items on a 1D grid passing along the current thread id.
+ *
+ * The function implements a parallel version of the following snippet:
+ *
+ *   for (size_t i = 0; i < range; i++)
+ *     function(context, thread_index, i);
+ *
+ * When the function returns, all items have been processed and the thread pool
+ * is ready for a new task.
+ *
+ * @note If multiple threads call this function with the same thread pool, the
+ *    calls are serialized.
+ *
+ * @param threadpool  the thread pool to use for parallelisation. If threadpool
+ *    is NULL, all items are processed serially on the calling thread.
+ * @param function    the function to call for each item.
+ * @param context     the first argument passed to the specified function.
+ * @param range       the number of items on the 1D grid to process. The
+ *    specified function will be called once for each item.
+ * @param flags       a bitwise combination of zero or more optional flags
+ *    (PTHREADPOOL_FLAG_DISABLE_DENORMALS or PTHREADPOOL_FLAG_YIELD_WORKERS)
+ */
+void pthreadpool_parallelize_1d_with_thread(
+	pthreadpool_t threadpool,
+	pthreadpool_task_1d_with_thread_t function,
 	void* context,
 	size_t range,
 	uint32_t flags);
