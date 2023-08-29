@@ -802,6 +802,10 @@ PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_2d_fastpath(
 	struct pthreadpool* threadpool,
 	struct thread_info* thread);
 
+PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_2d_with_thread_fastpath(
+	struct pthreadpool* threadpool,
+	struct thread_info* thread);
+
 PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_2d_tile_1d_fastpath(
 	struct pthreadpool* threadpool,
 	struct thread_info* thread);

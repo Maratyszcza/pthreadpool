@@ -92,6 +92,21 @@ void pthreadpool_parallelize_2d(
 	}
 }
 
+void pthreadpool_parallelize_2d_with_thread(
+	struct pthreadpool* threadpool,
+	pthreadpool_task_2d_with_thread_t task,
+	void* argument,
+	size_t range_i,
+	size_t range_j,
+	uint32_t flags)
+{
+	for (size_t i = 0; i < range_i; i++) {
+		for (size_t j = 0; j < range_j; j++) {
+			task(argument, 0, i, j);
+		}
+	}
+}
+
 void pthreadpool_parallelize_2d_tile_1d(
 	pthreadpool_t threadpool,
 	pthreadpool_task_2d_tile_1d_t task,
