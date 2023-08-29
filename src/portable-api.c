@@ -223,8 +223,9 @@ static void thread_parallelize_2d_with_thread(struct pthreadpool* threadpool, st
 	size_t i = index_i_j.quotient;
 	size_t j = index_i_j.remainder;
 
+	const size_t thread_number = thread->thread_number;
 	while (pthreadpool_try_decrement_relaxed_size_t(&thread->range_length)) {
-		task(argument, 0, i, j);
+		task(argument, thread_number, i, j);
 		if (++j == range_j.value) {
 			j = 0;
 			i += 1;
@@ -232,7 +233,6 @@ static void thread_parallelize_2d_with_thread(struct pthreadpool* threadpool, st
 	}
 
 	/* There still may be other threads with work */
-	const size_t thread_number = thread->thread_number;
 	const size_t threads_count = threadpool->threads_count.value;
 	for (size_t tid = modulo_decrement(thread_number, threads_count);
 		tid != thread_number;

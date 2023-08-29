@@ -247,8 +247,9 @@ PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_2d_with_thread_fastpath
 	size_t i = index_i_j.quotient;
 	size_t j = index_i_j.remainder;
 
+	const size_t thread_number = thread->thread_number;
 	while (pthreadpool_decrement_fetch_relaxed_size_t(&thread->range_length) < range_threshold) {
-		task(argument, 0, i, j);
+		task(argument, thread_number, i, j);
 		if (++j == range_j.value) {
 			j = 0;
 			i += 1;
@@ -256,7 +257,6 @@ PTHREADPOOL_INTERNAL void pthreadpool_thread_parallelize_2d_with_thread_fastpath
 	}
 
 	/* There still may be other threads with work */
-	const size_t thread_number = thread->thread_number;
 	for (size_t tid = modulo_decrement(thread_number, threads_count);
 		tid != thread_number;
 		tid = modulo_decrement(tid, threads_count))
