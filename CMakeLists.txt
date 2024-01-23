@@ -35,7 +35,7 @@ ENDIF()
 
 MACRO(PTHREADPOOL_TARGET_ENABLE_CXX11 target)
   SET_TARGET_PROPERTIES(${target} PROPERTIES
-    CXX_STANDARD 11
+    CXX_STANDARD 14
     CXX_EXTENSIONS NO)
 ENDMACRO()
 
@@ -133,7 +133,7 @@ ELSE()
 ENDIF()
 
 SET_TARGET_PROPERTIES(pthreadpool PROPERTIES
-  C_STANDARD 11
+  C_STANDARD 14
   C_EXTENSIONS NO)
 TARGET_LINK_LIBRARIES(pthreadpool PUBLIC pthreadpool_interface)
 TARGET_INCLUDE_DIRECTORIES(pthreadpool PRIVATE src)
@@ -178,14 +178,14 @@ IF(PTHREADPOOL_BUILD_TESTS)
 
   ADD_EXECUTABLE(pthreadpool-test test/pthreadpool.cc)
   SET_TARGET_PROPERTIES(pthreadpool-test PROPERTIES
-    CXX_STANDARD 11
+    CXX_STANDARD 14
     CXX_EXTENSIONS NO)
   TARGET_LINK_LIBRARIES(pthreadpool-test pthreadpool gtest gtest_main)
   ADD_TEST(pthreadpool pthreadpool-test)
 
   ADD_EXECUTABLE(pthreadpool-cxx-test test/pthreadpool-cxx.cc)
   SET_TARGET_PROPERTIES(pthreadpool-cxx-test PROPERTIES
-    CXX_STANDARD 11
+    CXX_STANDARD 14
     CXX_EXTENSIONS NO)
   TARGET_LINK_LIBRARIES(pthreadpool-cxx-test pthreadpool gtest gtest_main)
   ADD_TEST(pthreadpool-cxx pthreadpool-cxx-test)
@@ -202,13 +202,13 @@ IF(PTHREADPOOL_BUILD_BENCHMARKS)
 
   ADD_EXECUTABLE(latency-bench bench/latency.cc)
   SET_TARGET_PROPERTIES(latency-bench PROPERTIES
-    CXX_STANDARD 11
+    CXX_STANDARD 14
     CXX_EXTENSIONS NO)
   TARGET_LINK_LIBRARIES(latency-bench pthreadpool benchmark)
 
   ADD_EXECUTABLE(throughput-bench bench/throughput.cc)
   SET_TARGET_PROPERTIES(throughput-bench PROPERTIES
-    CXX_STANDARD 11
+    CXX_STANDARD 14
     CXX_EXTENSIONS NO)
   TARGET_LINK_LIBRARIES(throughput-bench pthreadpool benchmark)
 ENDIF()
