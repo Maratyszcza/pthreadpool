@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <memory>
 
+#include <mutex>
 
 typedef std::unique_ptr<pthreadpool, decltype(&pthreadpool_destroy)> auto_pthreadpool_t;
 
@@ -9918,4 +9919,339 @@ TEST(Parallelize6DTile2D, MultiThreadPoolWorkStealing) {
 		kParallelize6DTile2DTileM, kParallelize6DTile2DTileN,
 		0 /* flags */);
 	EXPECT_EQ(num_processed_items.load(std::memory_order_relaxed), kParallelize6DTile2DRangeI * kParallelize6DTile2DRangeJ * kParallelize6DTile2DRangeK * kParallelize6DTile2DRangeL * kParallelize6DTile2DRangeM * kParallelize6DTile2DRangeN);
+}
+
+struct array_addition_context {
+	double *augend;
+	double *addend;
+	double *sum;
+	std::mutex m;
+	int num_threads;
+	int* thread_ids;
+};
+
+static void add_arrays(struct array_addition_context* context, size_t start_i, size_t tile_i) {
+#if defined(__linux__) || defined(__EMSCRIPTEN__) || defined(_WIN32) || defined(__CYGWIN__)
+	{
+		int thread_id;
+#if defined(_WIN32) || defined(__CYGWIN__)
+		thread_id = GetCurrentThreadId();
+#else
+		thread_id = pthread_self();
+#endif
+		std::lock_guard<std::mutex> l(context->m);
+		for (int i = 0; i < context->num_threads; i++) {
+			if (context->thread_ids[i] == thread_id) {
+				break;
+			}
+			else if (context->thread_ids[i] == 0) {
+				context->thread_ids[i] = thread_id;
+				break;
+			}
+		}
+	}
+#endif
+	for (size_t i = start_i; i < start_i + tile_i; ++i) {
+		context->sum[i] = context->augend[i] + context->addend[i];
+	}
+}
+
+void init_context(double* augend, double* addend, double* sum, int* thread_ids, int num_threads, struct array_addition_context* context, double* ref_sum, double init_val=1.5) {
+	double val = init_val;
+	for (size_t i = 0; i < kParallelize1DTile1DRange; ++i) {
+		augend[i] = val;
+		addend[i] = val;
+		ref_sum[i] = 2 * val;
+	}
+	for (size_t i = 0; i < num_threads ; ++i) {
+		thread_ids[i] = 0;
+	}
+
+	context->augend = augend;
+	context->addend = addend;
+	context->sum = sum;
+	context->num_threads = num_threads;
+	context->thread_ids = thread_ids;
+}
+
+void check_num_threads_used(int* thread_ids, int num_threads, int num_threads_used) {
+#if defined(__linux__) || defined(__EMSCRIPTEN__) || defined(_WIN32) || defined(__CYGWIN__)
+	int total_threads = 0;
+	for (size_t i = 0; i < num_threads ; ++i) {
+		if (thread_ids[i] != 0) {
+			total_threads += 1;
+		}
+	}
+	EXPECT_EQ(total_threads, num_threads_used);
+#endif
+}
+
+TEST(CapNumThreadsTest, RunUnderCapacity) {
+
+	double augend[kParallelize1DTile1DRange];
+	double addend[kParallelize1DTile1DRange];
+	double sum[kParallelize1DTile1DRange];
+	double ref_sum[kParallelize1DTile1DRange];
+	int num_threads = 4;
+	int thread_ids[num_threads];
+
+	auto_pthreadpool_t threadpool(pthreadpool_create(num_threads), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+	pthreadpool_set_threads_count(threadpool.get(), 2);
+
+	struct array_addition_context context;
+	init_context(augend, addend, sum, thread_ids, num_threads, &context, ref_sum);
+
+	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
+		GTEST_SKIP();
+	}
+
+	pthreadpool_parallelize_1d_tile_1d(
+		threadpool.get(),
+		(pthreadpool_task_1d_tile_1d_t)add_arrays,
+		(void*) &context,
+		kParallelize1DTile1DRange, kParallelize1DTile1DTile,
+		0 /* flags */);
+
+	for (size_t i = 0; i < kParallelize1DTile1DRange; ++i) {
+		EXPECT_LT(abs(context.sum[i] - ref_sum[i]), 1e-5);
+	}
+	check_num_threads_used(thread_ids, num_threads, 2);
+}
+
+TEST(CapNumThreadsTest, RunUnderCapacitySetMultipleTimes1) {
+
+	double augend[kParallelize1DTile1DRange];
+	double addend[kParallelize1DTile1DRange];
+	double sum[kParallelize1DTile1DRange];
+	double ref_sum[kParallelize1DTile1DRange];
+	int num_threads = 4;
+	int thread_ids[num_threads];
+
+	struct array_addition_context context;
+	init_context(augend, addend, sum, thread_ids, num_threads, &context, ref_sum);
+
+	auto_pthreadpool_t threadpool(pthreadpool_create(num_threads), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+	pthreadpool_set_threads_count(threadpool.get(), 2);
+	pthreadpool_set_threads_count(threadpool.get(), 3);
+
+	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
+		GTEST_SKIP();
+	}
+
+	pthreadpool_parallelize_1d_tile_1d(
+		threadpool.get(),
+		(pthreadpool_task_1d_tile_1d_t)add_arrays,
+		(void*) &context,
+		kParallelize1DTile1DRange, kParallelize1DTile1DTile,
+		0 /* flags */);
+
+	for (size_t i = 0; i < kParallelize1DTile1DRange; ++i) {
+		EXPECT_LT(abs(context.sum[i] - ref_sum[i]), 1e-5);
+	}
+	check_num_threads_used(thread_ids, num_threads, 3);
+}
+
+TEST(CapNumThreadsTest, RunUnderCapacitySetMultipleTimes2) {
+
+	double augend[kParallelize1DTile1DRange];
+	double addend[kParallelize1DTile1DRange];
+	double sum[kParallelize1DTile1DRange];
+	double ref_sum[kParallelize1DTile1DRange];
+	int num_threads = 4;
+	int thread_ids[num_threads];
+
+	struct array_addition_context context;
+	init_context(augend, addend, sum, thread_ids, num_threads, &context, ref_sum);
+
+	auto_pthreadpool_t threadpool(pthreadpool_create(num_threads), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+	pthreadpool_set_threads_count(threadpool.get(), 2);
+
+	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
+		GTEST_SKIP();
+	}
+
+	pthreadpool_parallelize_1d_tile_1d(
+		threadpool.get(),
+		(pthreadpool_task_1d_tile_1d_t)add_arrays,
+		(void*) &context,
+		kParallelize1DTile1DRange, kParallelize1DTile1DTile,
+		0 /* flags */);
+
+	for (size_t i = 0; i < kParallelize1DTile1DRange; ++i) {
+		EXPECT_LT(abs(context.sum[i] - ref_sum[i]), 1e-5);
+	}
+	check_num_threads_used(thread_ids, num_threads, 2);
+
+	init_context(augend, addend, sum, thread_ids, num_threads, &context, ref_sum, 2.3);
+	pthreadpool_set_threads_count(threadpool.get(), 3);
+
+	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
+		GTEST_SKIP();
+	}
+
+	pthreadpool_parallelize_1d_tile_1d(
+		threadpool.get(),
+		(pthreadpool_task_1d_tile_1d_t)add_arrays,
+		(void*) &context,
+		kParallelize1DTile1DRange, kParallelize1DTile1DTile,
+		0 /* flags */);
+
+	for (size_t i = 0; i < kParallelize1DTile1DRange; ++i) {
+		EXPECT_LT(abs(context.sum[i] - ref_sum[i]), 1e-5);
+	}
+	check_num_threads_used(thread_ids, num_threads, 3);
+}
+
+TEST(CapNumThreadsTest, RunUnderCapacitySetMultipleTimes3) {
+
+	double augend[kParallelize1DTile1DRange];
+	double addend[kParallelize1DTile1DRange];
+	double sum[kParallelize1DTile1DRange];
+	double ref_sum[kParallelize1DTile1DRange];
+	int num_threads = 4;
+	int thread_ids[num_threads];
+
+	struct array_addition_context context;
+	init_context(augend, addend, sum, thread_ids, num_threads, &context, ref_sum);
+
+	auto_pthreadpool_t threadpool(pthreadpool_create(num_threads), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+	pthreadpool_set_threads_count(threadpool.get(), 1);
+
+	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
+		GTEST_SKIP();
+	}
+
+	pthreadpool_parallelize_1d_tile_1d(
+		threadpool.get(),
+		(pthreadpool_task_1d_tile_1d_t)add_arrays,
+		(void*) &context,
+		kParallelize1DTile1DRange, kParallelize1DTile1DTile,
+		0 /* flags */);
+
+	for (size_t i = 0; i < kParallelize1DTile1DRange; ++i) {
+		EXPECT_LT(abs(context.sum[i] - ref_sum[i]), 1e-5);
+	}
+	check_num_threads_used(thread_ids, num_threads, 1);
+
+	init_context(augend, addend, sum, thread_ids, num_threads, &context, ref_sum, 2.3);
+	pthreadpool_set_threads_count(threadpool.get(), 4);
+
+	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
+		GTEST_SKIP();
+	}
+
+	pthreadpool_parallelize_1d_tile_1d(
+		threadpool.get(),
+		(pthreadpool_task_1d_tile_1d_t)add_arrays,
+		(void*) &context,
+		kParallelize1DTile1DRange, kParallelize1DTile1DTile,
+		0 /* flags */);
+
+	for (size_t i = 0; i < kParallelize1DTile1DRange; ++i) {
+		EXPECT_LT(abs(context.sum[i] - ref_sum[i]), 1e-5);
+	}
+	check_num_threads_used(thread_ids, num_threads, 4);
+}
+
+TEST(CapNumThreadsTest, RunAtCapacity) {
+
+	double augend[kParallelize1DTile1DRange];
+	double addend[kParallelize1DTile1DRange];
+	double sum[kParallelize1DTile1DRange];
+	double ref_sum[kParallelize1DTile1DRange];
+	int num_threads = 4;
+	int thread_ids[num_threads];
+
+	struct array_addition_context context;
+	init_context(augend, addend, sum, thread_ids, num_threads, &context, ref_sum);
+
+	auto_pthreadpool_t threadpool(pthreadpool_create(num_threads), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+	pthreadpool_set_threads_count(threadpool.get(), num_threads);
+
+	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
+		GTEST_SKIP();
+	}
+
+	pthreadpool_parallelize_1d_tile_1d(
+		threadpool.get(),
+		(pthreadpool_task_1d_tile_1d_t)add_arrays,
+		(void*) &context,
+		kParallelize1DTile1DRange, kParallelize1DTile1DTile,
+		0 /* flags */);
+
+	for (size_t i = 0; i < kParallelize1DTile1DRange; ++i) {
+		EXPECT_LT(abs(context.sum[i] - ref_sum[i]), 1e-5);
+	}
+	check_num_threads_used(thread_ids, num_threads, num_threads);
+}
+
+TEST(CapNumThreadsTest, RunOverCapacity) {
+
+	double augend[kParallelize1DTile1DRange];
+	double addend[kParallelize1DTile1DRange];
+	double sum[kParallelize1DTile1DRange];
+	double ref_sum[kParallelize1DTile1DRange];
+	int num_threads = 4;
+	int thread_ids[num_threads];
+
+	struct array_addition_context context;
+	init_context(augend, addend, sum, thread_ids, num_threads, &context, ref_sum);
+
+	auto_pthreadpool_t threadpool(pthreadpool_create(num_threads), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+	pthreadpool_set_threads_count(threadpool.get(), 16);
+
+	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
+		GTEST_SKIP();
+	}
+
+	pthreadpool_parallelize_1d_tile_1d(
+		threadpool.get(),
+		(pthreadpool_task_1d_tile_1d_t)add_arrays,
+		(void*) &context,
+		kParallelize1DTile1DRange, kParallelize1DTile1DTile,
+		0 /* flags */);
+
+	for (size_t i = 0; i < kParallelize1DTile1DRange; ++i) {
+		EXPECT_LT(abs(context.sum[i] - ref_sum[i]), 1e-5);
+	}
+	check_num_threads_used(thread_ids, num_threads, num_threads);
+}
+
+TEST(CapNumThreadsTest, RunSingleThreaded) {
+
+	double augend[kParallelize1DTile1DRange];
+	double addend[kParallelize1DTile1DRange];
+	double sum[kParallelize1DTile1DRange];
+	double ref_sum[kParallelize1DTile1DRange];
+	int num_threads = 4;
+	int thread_ids[num_threads];
+
+	struct array_addition_context context;
+	init_context(augend, addend, sum, thread_ids, num_threads, &context, ref_sum);
+
+	auto_pthreadpool_t threadpool(pthreadpool_create(num_threads), pthreadpool_destroy);
+	ASSERT_TRUE(threadpool.get());
+	pthreadpool_set_threads_count(threadpool.get(), 1);
+
+	if (pthreadpool_get_threads_count(threadpool.get()) <= 1) {
+		GTEST_SKIP();
+	}
+
+	pthreadpool_parallelize_1d_tile_1d(
+		threadpool.get(),
+		(pthreadpool_task_1d_tile_1d_t)add_arrays,
+		(void*) &context,
+		kParallelize1DTile1DRange, kParallelize1DTile1DTile,
+		0 /* flags */);
+
+	for (size_t i = 0; i < kParallelize1DTile1DRange; ++i) {
+		EXPECT_LT(abs(context.sum[i] - ref_sum[i]), 1e-5);
+	}
+	check_num_threads_used(thread_ids, num_threads, 1);
 }

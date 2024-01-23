@@ -60,7 +60,7 @@ struct PTHREADPOOL_CACHELINE_ALIGNED thread_info {
 	 */
 	pthreadpool_atomic_size_t range_length;
 	/**
-	 * Thread number in the 0..threads_count-1 range.
+	 * Thread number in the 0..max_threads_count-1 range.
 	 */
 	size_t thread_number;
 	/**
@@ -78,6 +78,31 @@ struct PTHREADPOOL_CACHELINE_ALIGNED thread_info {
 	 * The Windows thread handle corresponding to the thread.
 	 */
 	HANDLE thread_handle;
+#endif
+
+#if !PTHREADPOOL_USE_GCD
+	/**
+	 * The last command submitted to the thread pool.
+	 */
+	pthreadpool_atomic_uint32_t command;
+#endif
+#if PTHREADPOOL_USE_CONDVAR
+	/**
+	 * Guards access to the @a command variable.
+	 */
+	pthread_mutex_t command_mutex;
+	/**
+	 * Condition variable to wait for change of the @a command variable.
+	 */
+	pthread_cond_t command_condvar;
+#endif
+#if PTHREADPOOL_USE_EVENT
+	/**
+	 * Events to wait on for change of the @a command variable.
+	 * To avoid race conditions due to spin-lock synchronization, we use two events and switch event in use after every
+	 * submitted command according to the high bit of the command word.
+	 */
+	HANDLE command_event[2];
 #endif
 };
 
@@ -635,12 +660,17 @@ struct pthreadpool_6d_tile_2d_params {
 };
 
 struct PTHREADPOOL_CACHELINE_ALIGNED pthreadpool {
-#if !PTHREADPOOL_USE_GCD
 	/**
 	 * The number of threads that are processing an operation.
 	 */
 	pthreadpool_atomic_size_t active_threads;
-#endif
+	/*
+	 * Enable restricting task parallelization among a subset of
+	 * pthreadpool threads.
+	 * As per this change, this feature is not available in GCD based
+	 * pthreadpool
+	 */
+	pthreadpool_atomic_size_t threads_count;
 #if PTHREADPOOL_USE_FUTEX
 	/**
 	 * Indicates if there are active threads.
@@ -649,12 +679,6 @@ struct PTHREADPOOL_CACHELINE_ALIGNED pthreadpool {
 	 * - has_active_threads == 1 if active_threads != 0
 	 */
 	pthreadpool_atomic_uint32_t has_active_threads;
-#endif
-#if !PTHREADPOOL_USE_GCD
-	/**
-	 * The last command submitted to the thread pool.
-	 */
-	pthreadpool_atomic_uint32_t command;
 #endif
 	/**
 	 * The entry point function to call for each thread in the thread pool for parallelization tasks.
@@ -727,14 +751,6 @@ struct PTHREADPOOL_CACHELINE_ALIGNED pthreadpool {
 	 * Condition variable to wait until all threads complete an operation (until @a active_threads is zero).
 	 */
 	pthread_cond_t completion_condvar;
-	/**
-	 * Guards access to the @a command variable.
-	 */
-	pthread_mutex_t command_mutex;
-	/**
-	 * Condition variable to wait for change of the @a command variable.
-	 */
-	pthread_cond_t command_condvar;
 #endif
 #if PTHREADPOOL_USE_EVENT
 	/**
@@ -742,19 +758,14 @@ struct PTHREADPOOL_CACHELINE_ALIGNED pthreadpool {
 	 * To avoid race conditions due to spin-lock synchronization, we use two events and switch event in use after every
 	 * submitted command according to the high bit of the command word.
 	 */
+	uint32_t completion_event_index;
 	HANDLE completion_event[2];
-	/**
-	 * Events to wait on for change of the @a command variable.
-	 * To avoid race conditions due to spin-lock synchronization, we use two events and switch event in use after every
-	 * submitted command according to the high bit of the command word.
-	 */
-	HANDLE command_event[2];
 #endif
 	/**
 	 * FXdiv divisor for the number of threads in the thread pool.
 	 * This struct never change after pthreadpool_create.
 	 */
-	struct fxdiv_divisor_size_t threads_count;
+	struct fxdiv_divisor_size_t max_threads_count;
 	/**
 	 * Thread information structures that immediately follow this structure.
 	 */
@@ -765,7 +776,7 @@ PTHREADPOOL_STATIC_ASSERT(sizeof(struct pthreadpool) % PTHREADPOOL_CACHELINE_SIZ
 	"pthreadpool structure must occupy an integer number of cache lines (64 bytes)");
 
 PTHREADPOOL_INTERNAL struct pthreadpool* pthreadpool_allocate(
-	size_t threads_count);
+	size_t max_threads_count);
 
 PTHREADPOOL_INTERNAL void pthreadpool_deallocate(
 	struct pthreadpool* threadpool);
