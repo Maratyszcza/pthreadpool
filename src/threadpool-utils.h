@@ -1,5 +1,6 @@
 #pragma once
 
+#include <assert.h>
 #include <stdint.h>
 #include <stddef.h>
 
@@ -105,6 +106,7 @@ static inline size_t modulo_decrement(size_t i, size_t n) {
 }
 
 static inline size_t divide_round_up(size_t dividend, size_t divisor) {
+	assert(divisor != 0);
 	if (dividend % divisor == 0) {
 		return dividend / divisor;
 	} else {
