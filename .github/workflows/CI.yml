@@ -1,0 +1,30 @@
+---
+name: ci
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+jobs:
+  linux-cmake:
+    name: Linux / CMake
+    runs-on: ubuntu-22.04
+    continue-on-error: false
+    steps:
+      - uses: actions/checkout@v3.3.0
+      - name: Install Dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            build-essential \
+            cmake
+      - name: Run Build
+        run: |
+          mkdir build
+          cd build
+          cmake ..
+          make
+      - name: Run Tests
+        run: ctest --verbose
