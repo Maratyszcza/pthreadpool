@@ -22,7 +22,7 @@
 PTHREADPOOL_INTERNAL struct pthreadpool* pthreadpool_allocate(
 	size_t threads_count)
 {
-	assert(threads_count >= 1);
+	assert(threads_count >= 1 && threads_count <= (SIZE_MAX - sizeof(struct pthreadpool)) / sizeof(struct thread_info));
 
 	const size_t threadpool_size = sizeof(struct pthreadpool) + threads_count * sizeof(struct thread_info);
 	struct pthreadpool* threadpool = NULL;
