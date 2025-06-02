@@ -4,8 +4,8 @@ PROJECT(googletest-download NONE)
 
 INCLUDE(ExternalProject)
 ExternalProject_Add(googletest
-	URL https://github.com/google/googletest/archive/release-1.10.0.zip
-	URL_HASH SHA256=94c634d499558a76fa649edb13721dce6e98fb1e7018dfaeba3cd7a083945e91
+	URL https://github.com/google/googletest/archive/release-1.12.0.zip
+	URL_HASH SHA256=ce7366fe57eb49928311189cb0e40e0a8bf3d3682fca89af30d884c25e983786
     SOURCE_DIR "${CMAKE_BINARY_DIR}/googletest-source"
     BINARY_DIR "${CMAKE_BINARY_DIR}/googletest"
 	CONFIGURE_COMMAND ""

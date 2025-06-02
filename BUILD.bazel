@@ -46,12 +46,14 @@ cc_library(
         ":watchos": INTERNAL_HDRS + GCD_IMPL_SRCS,
         ":tvos": INTERNAL_HDRS + GCD_IMPL_SRCS,
         ":windows_x86_64": INTERNAL_HDRS + WINDOWS_IMPL_SRCS,
+        ":windows_arm64": INTERNAL_HDRS + WINDOWS_IMPL_SRCS,
         "//conditions:default": INTERNAL_HDRS + PTHREADS_IMPL_SRCS,
     }) + select({
         ":linux_x86_64": ARCH_SPECIFIC_SRCS,
         ":android_x86": ARCH_SPECIFIC_SRCS,
         ":android_x86_64": ARCH_SPECIFIC_SRCS,
         ":windows_x86_64": ARCH_SPECIFIC_SRCS,
+        ":windows_arm64": ARCH_SPECIFIC_SRCS,
         ":macos_x86": ARCH_SPECIFIC_SRCS,
         ":macos_x86_64": ARCH_SPECIFIC_SRCS,
         ":macos_arm64": ARCH_SPECIFIC_SRCS,
@@ -107,6 +109,7 @@ cc_library(
         ":android_x86": ["-DPTHREADPOOL_USE_FASTPATH=1"],
         ":android_x86_64": ["-DPTHREADPOOL_USE_FASTPATH=1"],
         ":windows_x86_64": ["-DPTHREADPOOL_USE_FASTPATH=1"],
+        ":windows_arm64": ["-DPTHREADPOOL_USE_FASTPATH=1"],
         ":macos_x86": ["-DPTHREADPOOL_USE_FASTPATH=1"],
         ":macos_x86_64": ["-DPTHREADPOOL_USE_FASTPATH=1"],
         ":macos_arm64": ["-DPTHREADPOOL_USE_FASTPATH=1"],
@@ -411,6 +414,13 @@ config_setting(
     name = "windows_x86_64",
     values = {
         "cpu": "x64_windows",
+    },
+)
+
+config_setting(
+    name = "windows_arm64",
+    values = {
+        "cpu": "arm64_windows",
     },
 )
 
