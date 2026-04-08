@@ -25,3 +25,9 @@ obj/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+compile_commands.json
+MODULE.bazel.lock
+
+.cache/
+.tasks.json

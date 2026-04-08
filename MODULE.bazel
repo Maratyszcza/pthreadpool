@@ -1,0 +1,65 @@
+module(
+    name = "pthreadpool",
+    compatibility_level = 1,
+    bazel_compatibility = [">=7.2.1"],
+)
+
+bazel_dep(
+    name = "cpuinfo",
+    version = "0.0.0-20260312-7607ca5",
+)
+bazel_dep(
+    name = "fxdiv",
+    version = "0.0.0-20201209-63058ef",
+)
+bazel_dep(
+    name = "google_benchmark",
+    version = "1.9.5",
+    repo_name = "com_google_benchmark",
+    dev_dependency = True,
+)
+bazel_dep(
+    name = "googletest",
+    version = "1.17.0.bcr.2",
+    repo_name = "com_google_googletest",
+    dev_dependency = True,
+)
+bazel_dep(
+    name = "rules_cc",
+    version = "0.2.17",
+)
+bazel_dep(
+    name = "rules_license",
+    version = "1.0.0",
+)
+bazel_dep(
+    name = "platforms",
+    version = "1.0.0",
+)
+
+# Android NDK location and version is auto-detected from $ANDROID_NDK_HOME environment variable
+bazel_dep(
+    name = "rules_android_ndk",
+    version = "0.1.5",
+    dev_dependency = True,
+)
+
+android_ndk_repository_extension = use_extension("@rules_android_ndk//:extension.bzl", "android_ndk_repository_extension")
+use_repo(android_ndk_repository_extension, "androidndk")
+
+register_toolchains("@androidndk//:all")
+
+# Android SDK location and API is auto-detected from $ANDROID_HOME environment variable
+bazel_dep(
+    name = "rules_android",
+    version = "0.7.1",
+    dev_dependency = True,
+)
+
+remote_android_extensions = use_extension("@rules_android//bzlmod_extensions:android_extensions.bzl", "remote_android_tools_extensions")
+use_repo(remote_android_extensions, "android_tools")
+
+android_sdk_repository_extension = use_extension("@rules_android//rules/android_sdk_repository:rule.bzl", "android_sdk_repository_extension")
+use_repo(android_sdk_repository_extension, "androidsdk")
+
+register_toolchains("@androidsdk//:sdk-toolchain", "@androidsdk//:all")
